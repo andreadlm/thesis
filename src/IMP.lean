@@ -265,54 +265,59 @@ end
 theorem deterministic {c : com} {s : state} :
    ∀{t : state}, (c, s) ⇒ t → ∀{r : state}, (c, s) ⇒ r → (t = r) :=
 begin
-  intros t hcst,
-  induction hcst,
-    case Skip : {
-      intros r hcsr,
-      cases hcsr,
-      reflexivity
-    },
-    case Assign : {
-      intros r hcsr,
-      cases hcsr,
-      reflexivity
-    },
-    case Seq : c₁ c₂ s s₂ _ _ _ hcst_ih₁ hcst_ih₂ {
+  assume t : state,
+  assume : (c, s) ⇒ t,
+  induction ‹(c, s) ⇒ t›,
+    case Skip : s {
       assume r : state,
-      assume hcsr : (c₁ ;; c₂, s) ⇒ r,
-      cases hcsr with _ _ _ _ _ _ _ r₁ _ hc₁sr₁ hc₂r₁r,
-      have : (r₁ = s₂) := (hcst_ih₁ hc₁sr₁).symm,
-      rw ‹r₁ = s₂› at hc₂r₁r,
-      rename hc₂r₁r hc₂s₂r,
-      exact hcst_ih₂ hc₂s₂r
+      assume : (SKIP, s) ⇒ r,
+      cases ‹(SKIP, s) ⇒ r›,
+      reflexivity
     },
-    case IfTrue : {
-      intros r hcsr,
-      cases hcsr,
-        case IfTrue : { apply hcst_ih, assumption },
+    case Assign : s x a {
+      assume r : state,
+      assume : (x ::= a, s) ⇒ r, 
+      cases ‹(x ::= a, s) ⇒ r›,
+      reflexivity
+    },
+    case Seq : c₁ c₂ s s₁ t _ _ ih₁ ih₂ {
+      assume r : state,
+      assume : (c₁ ;; c₂, s) ⇒ r,
+      cases ‹(c₁ ;; c₂, s) ⇒ r›, rename this_s₂ → s₂,
+      have : (s₂ = s₁) := (ih₁ ‹(c₁, s) ⇒ s₂›).symm,
+      rw ‹s₂ = s₁› at *,
+      exact ih₂ ‹(c₂, s₁) ⇒ r›
+    },
+    case IfTrue : b c₁ c₂ s _ _ _ ih {
+      assume r : state,
+      assume : (IF b THEN c₁ ELSE c₂, s) ⇒ r,
+      cases ‹(IF b THEN c₁ ELSE c₂, s) ⇒ r›,
+        case IfTrue : { exact ih ‹(c₁, s) ⇒ r› },
         case IfFalse : { contradiction }
     },
-    case IfFalse : {
-      intros r hcsr,
-      cases hcsr,
-        case IfTrue : { contradiction },
-        case IfFalse : { apply hcst_ih, assumption }
-    },
-    case WhileTrue : b c s s₂ _ _ _ _ hcst_ih₁ ichst_ih₂ {
+    case IfFalse : b c₁ c₂ s _ _ _ ih {
       assume r : state,
-      assume hcsr : (WHILE b DO c, s) ⇒ r,
-      cases hcsr,
-        case WhileTrue : _ _ _ r₁ _ _ hcsr₁ hWbcr₁r  {
-          have : (r₁ = s₂) := (hcst_ih₁ hcsr₁).symm,
-          rw ‹r₁ = s₂› at hWbcr₁r,
-          rename hWbcr₁r hWbcs₂r,
-          exact ichst_ih₂ hWbcs₂r
+      assume : (IF b THEN c₁ ELSE c₂, s) ⇒ r,
+      cases ‹(IF b THEN c₁ ELSE c₂, s) ⇒ r›,
+        case IfTrue : { contradiction },
+        case IfFalse : { exact ih ‹(c₂, s) ⇒ r› }
+    },
+    case WhileTrue : b c s s₁ _ _ _ _ ih₁ ih₂ {
+      assume r : state,
+      assume : (WHILE b DO c, s) ⇒ r,
+      cases ‹(WHILE b DO c, s) ⇒ r›,
+        case WhileTrue : { 
+          rename this_s₂ → s₂,
+          have : (s₂ = s₁) := (ih₁ ‹(c, s) ⇒ s₂›).symm,
+          rw ‹s₂ = s₁› at *,
+          exact ih₂ ‹(WHILE b DO c, s₁) ⇒ r›
         },
         case WhileFalse : { contradiction }
     },
-    case WhileFalse : {
-      intros r hcsr,
-      cases hcsr,
+    case WhileFalse : b c s {
+      assume r : state,
+      assume : (WHILE b DO c, s) ⇒ r,
+      cases ‹(WHILE b DO c, s) ⇒ r›,
         case WhileTrue : { contradiction },
         case WhileFalse : { reflexivity }
     }
