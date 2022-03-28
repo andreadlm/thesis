@@ -325,4 +325,34 @@ end
 
 end big_step
 
+inductive small_step : com × state → com × state → Prop
+| Assign  {s : state} {x : vname} {a : aexp} :
+  small_step (x ::= a, s) (SKIP, s[x ↦ aval a s])
+
+| Seq1 {c₂ : com} {s : state} :
+  small_step (SKIP;;c₂, s) (c₂, s)
+
+| Seq2 {c₁ c₁' c₂ : com} {s s' : state} :
+  small_step (c₁, s) (c₁', s') →
+  small_step (c₁ ;; c₂, s) (c₁';;c₂, s)
+
+| IfTrue {b : bexp} {s : state} {c₁ c₂ : com}:
+  bval b s →
+  small_step (IF b THEN c₁ ELSE c₂, s) (c₁, s)
+
+| IfFalse {b : bexp} {s : state} {c₁ c₂ : com}:
+  ¬bval b s →
+  small_step (IF b THEN c₁ ELSE c₂, s) (c₂, s)
+
+| While {b : bexp} {c : com} {s : state} :
+  small_step (WHILE b DO c, s) (IF b THEN (c ;; WHILE b DO c) ELSE SKIP, s)
+
+infix ` ↝ `:70 := small_step
+
+open small_step
+
+namespace small_step
+
+end small_step 
+
 end IMP
