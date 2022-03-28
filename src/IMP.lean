@@ -349,6 +349,31 @@ inductive small_step : com × state → com × state → Prop
 
 infix ` ↝ `:70 := small_step
 
+inductive small_step_star : com × state → com × state → Prop
+| refl {c : com} {s : state} : small_step_star (c, s) (c, s)
+
+| trans {c c₁ c₂ : com} {s s₁ s₂ : state}:
+  small_step (c, s) (c₁, s₁) →
+  small_step_star (c₁, s₁) (c₂, s₂) →
+  small_step_star (c, s) (c₂, s₂)
+
+infix ` ↝* `:70 := small_step_star
+
+open small_step_star
+
+@[trans]
+lemma small_step_star_is_trans {c c₁ c₂ : com} {s s₁ s₂ : state} : 
+  (c, s)↝*(c₁, s₁) → (c₁, s₁)↝*(c₂, s₂) → (c, s)↝*(c₂, s₂) :=
+begin
+  intros,
+  induction ‹(c, s)↝*(c₁, s₁)›,
+    case refl : { assumption },
+    case trans : c c₃ c₁ s s₃ s₁  _ _ ih {
+      have : (c₃, s₃) ↝* (c₂, s₂) := ih ‹(c₁, s₁) ↝* (c₂, s₂)›,
+      exact small_step_star.trans ‹(c, s) ↝ (c₃, s₃)› ‹(c₃, s₃) ↝* (c₂, s₂)›
+    }
+end
+
 open small_step
 
 namespace small_step
