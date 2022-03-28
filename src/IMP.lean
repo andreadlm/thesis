@@ -225,14 +225,49 @@ begin
     }
 end
 
-notation c₁ `~` c₂ := ∀{s t : state}, (c₁, s) ⇒ t = (c₂, s) ⇒ t
+notation c₁ `∼` c₂ := ∀{s t : state}, (c₁, s) ⇒ t = (c₂, s) ⇒ t
+
+lemma eq_while_ifwhile {b : bexp} {c : com} : WHILE b DO c ∼ IF b THEN (c ;; WHILE b DO c) ELSE SKIP :=
+begin
+  intros,
+  apply iff.to_eq,
+  split,
+    { 
+      intros,
+      cases ‹(WHILE b DO c, s) ⇒ t›,
+        case WhileFalse : {
+          show  (IF b THEN (c ;; WHILE b DO c) ELSE SKIP, s) ⇒ s, from
+            IfFalse ‹¬↥(bval b s)› Skip
+        },
+        case WhileTrue : {
+          rename ᾰ_s₂ → s',
+          show (IF b THEN (c ;; WHILE b DO c) ELSE SKIP, s) ⇒ t, from
+            IfTrue ‹↥(bval b s)› (Seq ‹(c, s) ⇒ s'› ‹(WHILE b DO c, s') ⇒ t›)
+        }
+    },
+    {
+      intros,
+      cases ‹(IF b THEN (c ;; WHILE b DO c) ELSE SKIP, s) ⇒ t›,
+        case IfTrue : {
+          cases ‹(c ;; WHILE b DO c, s) ⇒ t›,
+          rename ᾰ_ᾰ_1_s₂ → s',
+          show (WHILE b DO c, s) ⇒ t, from
+            WhileTrue ‹↥(bval b s)› ‹(c, s) ⇒ s'› ‹(WHILE b DO c, s') ⇒ t›
+        },
+        case IfFalse : {
+          cases ‹(SKIP, s) ⇒ t›,
+          show (WHILE b DO c, s) ⇒ s, from
+            WhileFalse ‹¬↥(bval b s)›
+        }
+    }
+end
 
 theorem deterministic {c : com} {s : state} :
    ∀{t : state}, (c, s) ⇒ t → ∀{r : state}, (c, s) ⇒ r → (t = r) :=
 begin
   intros t hcst,
   induction hcst,
-    case Skip : { 
+    case Skip : {
       intros r hcsr,
       cases hcsr,
       reflexivity
