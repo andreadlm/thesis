@@ -361,10 +361,14 @@ infix ` ↝* `:70 := small_step_star
 
 open small_step_star
 
-@[trans]
-lemma small_step_star_is_trans {c c₁ c₂ : com} {s s₁ s₂ : state} : 
-  (c, s)↝*(c₁, s₁) → (c₁, s₁)↝*(c₂, s₂) → (c, s)↝*(c₂, s₂) :=
+-- Lemmi tecnici: servono ad utilizzare l'ambiente calc
+-- ?TODO: versioni più compatte con pattern matching
+@[trans] lemma small_step_star_small_step_star_trans {st st₁ st₂: com × state} :
+  st ↝* st₁ → st₁ ↝* st₂ → st ↝* st₂ :=
 begin
+  cases st with c s,
+  cases st₁ with c₁ s₁,
+  cases st₂ with c₂ s₂,
   intros,
   induction ‹(c, s)↝*(c₁, s₁)›,
     case refl : { assumption },
@@ -374,10 +378,65 @@ begin
     }
 end
 
+@[trans] lemma small_step_star_small_step_trans {st st₁ st₂: com × state} :
+  st ↝* st₁ → st₁ ↝ st₂ → st ↝* st₂ :=
+begin
+  cases st with c s,
+  cases st₁ with c₁ s₁,
+  cases st₂ with c₂ s₂,
+  intros,
+  induction ‹(c, s) ↝* (c₁, s₁)›,
+    case refl : { 
+      apply small_step_star.trans, 
+      assumption, 
+      apply small_step_star.refl },
+    case trans : c c₃ c₁ s s₃ s₁  _ _ ih {
+      have : (c₃, s₃) ↝* (c₂, s₂) := ih ‹(c₁, s₁) ↝ (c₂, s₂)›,
+      exact small_step_star.trans ‹(c, s) ↝ (c₃, s₃)› ‹(c₃, s₃) ↝* (c₂, s₂)›
+    }
+end
+
+@[trans] lemma small_step_small_step_star_trans {st st₁ st₂: com × state} :
+  st ↝ st₁ → st₁ ↝* st₂ → st ↝* st₂ :=
+begin
+  cases st with c s,
+  cases st₁ with c₁ s₁,
+  cases st₂ with c₂ s₂,
+  intros,
+  exact small_step_star.trans ‹(c, s) ↝ (c₁, s₁)› ‹(c₁, s₁) ↝* (c₂, s₂)›
+end
+
+@[trans] lemma small_step_small_step_trans {st st₁ st₂: com × state} :
+  st ↝ st₁ → st₁ ↝ st₂ → st ↝* st₂ :=
+begin
+  cases st with c s, 
+  cases st₁ with c₁ s₁,
+  cases st₂ with c₂ s₂,
+  intros,
+  have : (c₁, s₁) ↝* (c₁, s₁) := small_step_star.refl,
+  have : (c, s) ↝* (c₁, s₁) := 
+    small_step_star.trans ‹(c, s) ↝ (c₁, s₁)› ‹(c₁, s₁) ↝* (c₁, s₁)›,
+  exact small_step_star_small_step_trans ‹(c, s) ↝* (c₁, s₁)› ‹(c₁, s₁) ↝ (c₂, s₂)›
+end
+
+
+/-
+constant s : state
+constant p : ↥(bval (Bc tt) s) 
+example : (IF (Bc tt) THEN SKIP ;; SKIP ELSE SKIP, s)↝*(SKIP, s) :=
+  calc
+    (IF (Bc tt) THEN SKIP ;; SKIP ELSE SKIP, s)↝(SKIP ;; SKIP, s) : 
+      small_step.IfTrue p
+    ...                                        ↝(SKIP, s)         : 
+      small_step.Seq1
+    ...                                        ↝*(SKIP, s)        :
+      small_step_star.refl 
+-/
+
 open small_step
 
 namespace small_step
 
-end small_step 
+end small_step
 
 end IMP
