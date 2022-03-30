@@ -36,9 +36,9 @@ inductive big_step : com × pstate → pstate → Prop
 
 infix ` ⇒ `:70 := big_step
 
-namespace big_step
-
 open big_step
+
+namespace big_step
 
 namespace rule_inversion
 
@@ -238,9 +238,11 @@ inductive small_step : com × pstate → com × pstate → Prop
 
 infix `↝`:70 := small_step
 
-namespace small_step
+abbreviation conf   := com × pstate
 
 open small_step
+
+namespace small_step
 
 inductive small_step_star : com × pstate → com × pstate → Prop
 | refl {c : com} {s : pstate} : small_step_star (c, s) (c, s)
@@ -308,11 +310,13 @@ begin
   exact small_step_star_small_step_trans ‹(c, s)↝*(c₁, s₁)› ‹(c₁, s₁)↝(c₂, s₂)›
 end
 
-end trans
+section small_step_calc_ex
 
-/-
-constant s : state
-constant p : ↥(bval (Bc tt) s) 
+open bexp
+
+variable s : pstate
+variable p : ↥(bval (Bc tt) s) 
+
 example : (IF (Bc tt) THEN SKIP ;; SKIP ELSE SKIP, s)↝*(SKIP, s) :=
   calc
     (IF (Bc tt) THEN SKIP ;; SKIP ELSE SKIP, s)↝(SKIP ;; SKIP, s) : 
@@ -321,6 +325,61 @@ example : (IF (Bc tt) THEN SKIP ;; SKIP ELSE SKIP, s)↝*(SKIP, s) :=
       small_step.Seq1
     ...                                        ↝*(SKIP, s)        :
       small_step_star.refl 
--/
+
+end small_step_calc_ex
+
+end trans
+
+theorem deterministic {c : com} {s : pstate} : 
+  ∀{cs₁ : conf}, (c, s)↝cs₁ → ∀{cs₂ : conf}, (c, s)↝cs₂ → cs₁ = cs₂ :=
+begin
+  assume cs₁ : conf,
+  assume : (c, s)↝cs₁,
+  induction ‹(c, s)↝cs₁›,
+    case Assign : s x a {
+      intros,
+      cases ‹(x ::= a, s)↝cs₂›,
+      reflexivity
+    },
+    case Seq1 : c₂ s {
+      intros,
+      cases ‹(SKIP ;; c₂, s)↝cs₂›,
+        case Seq1 : { trivial },
+        case Seq2 : c₁' _ _ s' { 
+          cases ‹(SKIP, s)↝(c₁', s')›
+          -- Nessun costruttore valido
+          }
+    },
+    case Seq2 : c₁ c₁' c₂ s s' _ ih  {
+      intros,
+      cases ‹(c₁ ;; c₂, s)↝cs₂›,
+        case Seq1 : {
+          cases ‹(SKIP, s)↝(c₁', s')›
+          -- Nessun costruttore valido
+        },
+        case Seq2 : c₁ c₁'' c₂ s s''  {
+          have : (c₁', s') = (c₁'', s'') := ih ‹(c₁, s)↝(c₁'', s'')›,
+          have : c₁' = c₁'' := by injection ‹(c₁', s') = (c₁'', s'')›,
+          rw ‹c₁' = c₁''›
+        }
+    },
+    case IfTrue : b s c' c'' {
+      intros,
+      cases ‹(IF b THEN c' ELSE c'', s)↝cs₂›,
+        case IfTrue : { trivial },
+        case IfFalse : { trivial }
+    },
+    case IfFalse : b s c' c'' {
+      intros,
+      cases ‹(IF b THEN c' ELSE c'', s)↝cs₂›,
+        case IfTrue : { trivial },
+        case IfFalse : { trivial }
+    },
+    case While : b c s {
+      intros,
+      cases ‹(WHILE b DO c, s)↝cs₂›,
+      reflexivity
+    }
+end
 
 end small_step
