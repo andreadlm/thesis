@@ -403,10 +403,10 @@ begin
 
     },
     case Seq : _ _ _ _ _ _ _ ih₁ ih₂ {
-        calc
-          (c₁ ;; c₂, s₁)↝*(SKIP ;; c₂, s₂) : seq_star ‹(c₁, s₁)↝*(SKIP, s₂)›
-          ...           ↝ (c₂, s₂)         : Seq1
-          ...           ↝*(SKIP, t)        : ih₂
+      calc
+        (c₁ ;; c₂, s₁)↝*(SKIP ;; c₂, s₂) : seq_star ‹(c₁, s₁)↝*(SKIP, s₂)›
+        ...           ↝ (c₂, s₂)         : Seq1
+        ...           ↝*(SKIP, t)        : ih₂
       
     },
     case IfTrue : {
