@@ -37,8 +37,6 @@ inductive big_step : com × pstate → pstate → Prop
 
 infix ` ⟹ `:70 := big_step
 
-#print notation
-
 open big_step
 
 namespace big_step
@@ -322,12 +320,9 @@ variable p : ↥(bval (Bc tt) s)
 
 example : (IF (Bc tt) THEN SKIP ;; SKIP ELSE SKIP, s)↝*(SKIP, s) :=
   calc
-    (IF (Bc tt) THEN SKIP ;; SKIP ELSE SKIP, s)↝(SKIP ;; SKIP, s) : 
-      small_step.IfTrue p
-    ...                                        ↝(SKIP, s)         : 
-      small_step.Seq1
-    ...                                        ↝*(SKIP, s)        :
-      small_step_star.refl 
+    (IF (Bc tt) THEN SKIP ;; SKIP ELSE SKIP, s)↝ (SKIP ;; SKIP, s) : small_step.IfTrue p
+    ...                                        ↝ (SKIP, s)         : small_step.Seq1
+    ...                                        ↝*(SKIP, s)         : small_step_star.refl 
 
 end small_step_calc_ex
 
