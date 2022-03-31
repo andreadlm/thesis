@@ -3,7 +3,7 @@ import tactic.induction
 
 open com
 
-inductive big_step : com × pstate → pstate → Prop
+inductive big_step : conf → pstate → Prop
 | Skip {s : pstate} : 
   big_step (SKIP, s) s
 
@@ -215,7 +215,7 @@ end
 
 end big_step
 
-inductive small_step : com × pstate → com × pstate → Prop
+inductive small_step : conf → conf → Prop
 | Assign  {s : pstate} {x : vname} {a : aexp} :
   small_step (x ::= a, s) (SKIP, s[x ↦ aval a s])
 
@@ -239,8 +239,6 @@ inductive small_step : com × pstate → com × pstate → Prop
 
 infix `↝`:70 := small_step
 
-abbreviation conf := com × pstate
-
 open small_step
 
 namespace small_step
@@ -259,7 +257,7 @@ namespace trans
 
 open small_step_star
 
-@[trans] lemma small_step_star_small_step_star_trans {st st₁ st₂: com × pstate} :
+@[trans] lemma small_step_star_small_step_star_trans {st st₁ st₂: conf} :
   st ↝* st₁ → st₁ ↝* st₂ → st ↝* st₂ :=
 begin
   cases st with c s,
@@ -274,7 +272,7 @@ begin
     }
 end
 
-@[trans] lemma small_step_star_small_step_trans {st st₁ st₂: com × pstate} :
+@[trans] lemma small_step_star_small_step_trans {st st₁ st₂: conf} :
   st ↝* st₁ → st₁ ↝ st₂ → st ↝* st₂ :=
 begin
   cases st with c s,
@@ -289,7 +287,7 @@ begin
     }
 end 
 
-@[trans] lemma small_step_small_step_star_trans {st st₁ st₂: com × pstate} :
+@[trans] lemma small_step_small_step_star_trans {st st₁ st₂: conf} :
   st ↝ st₁ → st₁ ↝* st₂ → st ↝* st₂ :=
 begin
   cases st with c s,
@@ -299,7 +297,7 @@ begin
   exact step ‹(c, s)↝(c₁, s₁)› ‹(c₁, s₁)↝*(c₂, s₂)›
 end
 
-@[trans] lemma small_step_small_step_trans {st st₁ st₂: com × pstate} :
+@[trans] lemma small_step_small_step_trans {st st₁ st₂: conf} :
   st ↝ st₁ → st₁ ↝ st₂ → st ↝* st₂ :=
 begin
   cases st with c s, 

@@ -108,3 +108,5 @@ infix ` ::= `:68                                    := com.Assign
 infix ` ;; `:67                                     := com.Seq
 notation `IF `:0 b ` THEN `:0 c₁ ` ELSE `:68 c₂:68  := com.If b c₁ c₂
 notation `WHILE `:0 b ` DO `:68 c:68                := com.While b c
+
+abbreviation conf := com × pstate
