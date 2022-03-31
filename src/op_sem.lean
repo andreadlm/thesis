@@ -152,64 +152,47 @@ begin
     }
 end
 
-theorem deterministic {c : com} {s : pstate} :
-   ∀{t : pstate}, (c, s) ⟹ t → ∀{r : pstate}, (c, s) ⟹ r → (t = r) :=
+theorem deterministic {c : com} {s t r : pstate} :
+  (c, s) ⟹ t → (c, s) ⟹ r → (t = r) :=
 begin
-  assume t : pstate,
-  assume : (c, s) ⟹ t,
-  induction ‹(c, s) ⟹ t›,
-    case Skip : s {
-      assume r : pstate,
-      assume : (SKIP, s) ⟹ r,
-      cases ‹(SKIP, s) ⟹ r›,
-      reflexivity
+  intros,
+  induction' ‹(c, s) ⟹ t›,
+    case Skip : s { 
+      cases ‹(SKIP, s) ⟹ r›, 
+      trivial 
     },
-    case Assign : s x a {
-      assume r : pstate,
-      assume : (x ::= a, s) ⟹ r, 
-      cases ‹(x ::= a, s) ⟹ r›,
-      reflexivity
+    case Assign : s x a { 
+      cases ‹(x ::= a, s) ⟹ r›, 
+      trivial 
     },
-    case Seq : c₁ c₂ s s₁ t _ _ ih₁ ih₂ {
-      assume r : pstate,
-      assume : (c₁ ;; c₂, s) ⟹ r,
-      cases ‹(c₁ ;; c₂, s) ⟹ r›, rename this_s₂ → s₂,
-      have : (s₂ = s₁) := (ih₁ ‹(c₁, s) ⟹ s₂›).symm,
-      rw ‹s₂ = s₁› at *,
-      exact ih₂ ‹(c₂, s₁) ⟹ r›
+    case Seq : _ _ s s₁ _ _ _ ih₁ ih₂ {
+      cases ‹(c₁ ;; c₂, s) ⟹ r› with _ _ _ _ _ _ _ s₃ _,
+      have : (s₁ = s₃) := ih₁ ‹(c₁, s) ⟹ s₃›,
+      rw ‹s₁ = s₃› at *,
+      exact ih₂ ‹(c₂, s₃) ⟹ r›
     },
-    case IfTrue : b c₁ c₂ s _ _ _ ih {
-      assume r : pstate,
-      assume : (IF b THEN c₁ ELSE c₂, s) ⟹ r,
+    case IfTrue : {
       cases ‹(IF b THEN c₁ ELSE c₂, s) ⟹ r›,
         case IfTrue : { exact ih ‹(c₁, s) ⟹ r› },
-        case IfFalse : { contradiction }
+        case IfFalse : { trivial }
     },
-    case IfFalse : b c₁ c₂ s _ _ _ ih {
-      assume r : pstate,
-      assume : (IF b THEN c₁ ELSE c₂, s) ⟹ r,
+    case IfFalse : {
       cases ‹(IF b THEN c₁ ELSE c₂, s) ⟹ r›,
-        case IfTrue : { contradiction },
+        case IfTrue : { trivial },
         case IfFalse : { exact ih ‹(c₂, s) ⟹ r› }
     },
-    case WhileTrue : b c s s₁ _ _ _ _ ih₁ ih₂ {
-      assume r : pstate,
-      assume : (WHILE b DO c, s) ⟹ r,
+    case WhileTrue : _ _ s s₁ _ _ _ _ ih₁ ih₂ {
       cases ‹(WHILE b DO c, s) ⟹ r›,
-        case WhileTrue : { 
-          rename this_s₂ → s₂,
-          have : (s₂ = s₁) := (ih₁ ‹(c, s) ⟹ s₂›).symm,
-          rw ‹s₂ = s₁› at *,
+        case WhileTrue : _ _ _ s₂ _ _ _ _ { 
+          have : (s₁ = s₂) := ih₁ ‹(c, s) ⟹ s₂›,
+          rw ←‹s₁ = s₂› at *,
           exact ih₂ ‹(WHILE b DO c, s₁) ⟹ r›
         },
         case WhileFalse : { contradiction }
     },
-    case WhileFalse : b c s {
-      assume r : pstate,
-      assume : (WHILE b DO c, s) ⟹ r,
-      cases ‹(WHILE b DO c, s) ⟹ r›,
-        case WhileTrue : { contradiction },
-        case WhileFalse : { reflexivity }
+    case WhileFalse : _ _ s _ { 
+      cases ‹(WHILE b DO c, s) ⟹ r›, 
+      all_goals { trivial }
     }
 end
 
