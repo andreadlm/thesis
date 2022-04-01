@@ -1,7 +1,54 @@
-import IMP
-import tactic.induction
+/-
+Authore: Andrea Delmastro
+-/
 
+import tactic.induction
+import IMP
 open com
+
+/-!
+# Semantica per IMP
+
+Questo file definisce le semantiche big-step e small-step per il linguaggio di programmazione IMP e ne
+dimostra l'equivalenza.
+
+La semantica di un linguaggio di programmazione descrive formalmente il processo compiuto da un calcolatore
+nell'esecuzione di un programma scritto in un dato linguaggio.
+
+## Note di implementazione
+
+Questo file utilizza i tattici `cases'` e `induction'` definiti in `tactic.induction`. Nonostante le medesime
+dimostrazioni siano ottenibili tramite i tattici `cases` e `induction` standard, le due versioni qui utilizzate
+meglio si prestano all'utilizzo con predicati induttivi e sono più 'naturali' rispetto alla medesima
+dimostrazione svolta su carta.
+
+## Notazione
+
+* `vname` : nome di variabile, `string`
+* `val` : valore di un'espressione, `ℕ`
+* `pstate` : stato di programma, funzione da `vname` a `val`
+* `s [ x  ↦  v ]` : aggiornamento dello stato `s`, con assegnazione di `v` a `x`
+* `::=` : comando di assegnamento
+* `;;` : concatenazione sequenziale di comandi
+* `conf` : configurazione, coppia `com × pstate`
+* `⟹` : relazione big-step
+* `∼` : equivalenza di comandi
+* `↝` : riduzione small-step
+* `↝*` : chiusura riflessiva e transitiva di `↝`
+
+## Riferimenti
+
+* [Nipkow, Klein, Concrete Semantics with Isabelle/HOL][Nipkow]
+-/
+
+/-!
+### Semantica operazionale big-step di IMP
+
+La semantica big-step ([Nipkow] Fig. 7.1) è una relazione a tre posti il cui significato è `(c, s)⇒ t` se 
+l'esecuzione del comando c nello stato iniziale s termina con lo stato  t. Gli stati intermedi nell'esecuzione
+del programma non sono visibili nella relazione: la relazione in sé considera come se il programma venisse
+eseguito in un unico grande step.
+-/
 
 inductive big_step : conf → pstate → Prop
 | Skip {s : pstate} : 
@@ -115,6 +162,15 @@ begin
     }
 end
 
+namespace com_equivalence
+
+/-!
+### Equivalenza di comandi
+
+Due comandi `c₁` e `c₂` sono definiti equivalenti se a partire dallo stesso s stato terminano nel medesimo 
+stato `t`. 
+-/
+
 notation c₁ `∼` c₂ := ∀{s t : pstate}, (c₁, s) ⟹ t = (c₂, s) ⟹ t
 
 lemma eq_while_ifwhile {b : bexp} {c : com} : WHILE b DO c ∼ IF b THEN (c ;; WHILE b DO c) ELSE SKIP :=
@@ -152,6 +208,12 @@ begin
     }
 end
 
+end com_equivalence
+
+/--
+Determinismo della semantica big-step. 
+Se l'esecuzione di `c` in `s` termina, allora esiste un unico `t` tale che `(c, s) ⟹ t`.
+-/
 theorem deterministic {c : com} {s t r : pstate} :
   (c, s) ⟹ t → (c, s) ⟹ r → (t = r) :=
 begin
@@ -198,6 +260,14 @@ end
 
 end big_step
 
+/-!
+### Semantica operazionale small-step di IMP
+
+La riduzione small-step ([Nipkow] Fig. 7.5)  `(c₁ , s₁)→(c₂ , s₂)` è una relazione tra due coppie comando/stato
+che rappresenta l'esecuzione di un singolo passo di calcolo di `c₁` nello stato `s₁` che produce lo stato `s₂`, 
+mentre `c₂` é la continuazione (ciò che resta da eseguire) di `c₁`. 
+-/
+
 inductive small_step : conf → conf → Prop
 | Assign  {s : pstate} {x : vname} {a : aexp} :
   small_step (x ::= a, s) (SKIP, s[x ↦ aval a s])
@@ -237,6 +307,12 @@ inductive small_step_star : conf → conf → Prop
 infix `↝*`:70 := small_step_star
 
 namespace trans
+
+/-!
+### Lemmi di transitività per ↝ e ↝*
+
+I seguenti lemmi sono puramente tecnici e utili alla configurazione dell'ambiente `calc`.
+-/
 
 open small_step_star
 
@@ -294,6 +370,10 @@ end
 
 section small_step_calc_ex
 
+/-!
+### Esempio di utilizzo dell'ambiente `calc` con ↝ e ↝*
+-/
+
 open bexp
 
 variable s : pstate
@@ -309,6 +389,11 @@ end small_step_calc_ex
 
 end trans
 
+/--
+Determinismo della semantica small-step. 
+Se la configurazione `(c, s)` si riduce di un passo, allora esiste un'unica configurazione `cs` tale 
+che `(c, s) ↝ cs`.
+-/
 theorem deterministic {c : com} {s : pstate} {cs₁ cs₂ : conf}: 
   (c, s)↝cs₁ ∧ (c, s)↝cs₂ → cs₁ = cs₂ :=
 begin
@@ -355,8 +440,6 @@ end small_step
 namespace equivalence
 
 open small_step.small_step_star
-open small_step
-open big_step
 
 lemma seq_star {c c₁ c₂ : com} {s₁ s₂ : pstate} :
   (c₁, s₁)↝*(c, s₂) → (c₁ ;; c₂, s₁)↝*(c ;; c₂, s₂) :=
@@ -371,6 +454,11 @@ begin
     }
 end
 
+/--
+La semantica big-step implica la semantica small-step.
+Se l'esecuzione di `c` in `s` termina in uno stato `t`, allora `(c, s)` si riduce in zero o più passi a 
+`(SKIP, t)`.
+-/
 lemma big_step_imp_small_step {c : com} {s t : pstate} : 
   (c, s) ⟹ t → (c, s)↝*(SKIP, t) :=
 begin
@@ -418,6 +506,10 @@ begin
     }
 end
 
+/--
+Se la configurazione `(c, s)` si riduce in un passo a `(c₁, s₁)` e l'esecuzione di `c₁` in `s₁` termina in `t`, 
+allora l'esecuzione di `c` in `s` termina in `t`.
+-/
 lemma step_case {c c₁ : com} {s s₁ t : pstate} : 
   (c, s)↝(c₁, s₁) → (c₁, s₁) ⟹ t → (c, s) ⟹ t :=
 begin
@@ -458,6 +550,12 @@ begin
     }
 end
 
+/--
+La semantica small-step implica la semantica big-step.
+Se la configurazione `(c, s)` si riduce in zero o più passi a `(SKIP, t)`, allora l'esecuzione di `c` in `s`
+termina nello stato `t`.
+La dimostrazione per il caso `refl` é banale, mentre nel caso `step` segue immediatamente dal lemma `step_case`.
+-/
 lemma small_step_imp_big_step {c : com} {s t : pstate} :
   (c, s)↝*(SKIP, t) → (c, s) ⟹ t :=
 begin
@@ -471,6 +569,10 @@ begin
     }
 end
 
+/--
+Equivalenza tra le due semantiche big-step e small-step.
+Il teorema segue immediatamente dai lemmi `big_step_imp_small_step` e `small_step_imp_big_step`.
+-/
 theorem big_step_equiv_small_step {c : com} {s t : pstate} :
   (c, s) ⟹ t ↔ (c, s)↝*(SKIP, t) :=
 begin
