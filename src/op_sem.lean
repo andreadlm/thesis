@@ -356,6 +356,7 @@ namespace equivalence
 
 open small_step.small_step_star
 open small_step
+open big_step
 
 lemma seq_star {c c₁ c₂ : com} {s₁ s₂ : pstate} :
   (c₁, s₁)↝*(c, s₂) → (c₁ ;; c₂, s₁)↝*(c ;; c₂, s₂) :=
@@ -414,6 +415,46 @@ begin
       calc
         (WHILE b DO c, t)↝(IF b THEN c ;; WHILE b DO c ELSE SKIP, t) : While
         ...              ↝(SKIP, t)                                  : IfFalse ‹¬↥(bval b t)›
+    }
+end
+
+lemma step_case {c c₁ : com} {s s₁ t : pstate} : 
+  (c, s)↝(c₁, s₁) → (c₁, s₁) ⟹ t → (c, s) ⟹ t :=
+begin
+  intros,
+  induction' ‹(c, s)↝(c₁, s₁)›,
+    case Assign : {
+      cases' ‹(SKIP, s[x ↦ aval a s]) ⟹ t›,
+      show (x ::= a, s) ⟹ s[x ↦ aval a s], from Assign
+    },
+    case Seq1 : {
+      have : (SKIP, s) ⟹ s := Skip,
+      show (SKIP ;; c₂, s) ⟹ t, from Seq ‹(SKIP, s) ⟹ s› ‹(c₂, s) ⟹ t›
+    },
+    case Seq2 : {
+      cases' ‹(c₁' ;; c₂, s') ⟹ t› with _ _ _ _ c₃ _ _ _ _,
+      have : (c₁, s) ⟹ s₂, from ih ‹(c₃, s₁) ⟹ s₂›,
+      show (c₁ ;; c₂, s) ⟹ t, from Seq ‹(c₁, s) ⟹ s₂› ‹(c₂, s₂) ⟹ t›
+    },
+    case IfTrue : {
+      show (IF b THEN c₁ ELSE c₂, s) ⟹ t, from 
+        IfTrue ‹↥(bval b s)› ‹(c₁, s) ⟹ t›
+    },
+    case IfFalse : {
+      show (IF b THEN c₁ ELSE c₂, s) ⟹ t, from 
+        IfFalse ‹¬↥(bval b s)› ‹(c₂, s) ⟹ t›
+    },
+    case While : {
+      cases' ‹(IF b THEN (c ;; WHILE b DO c) ELSE SKIP, s) ⟹ t›,
+        case IfTrue : {
+          cases' ‹(c ;; WHILE b DO c, s) ⟹ t›,
+          show (WHILE b DO c₁, s₁) ⟹ t, from
+            WhileTrue ‹↥(bval b s₁)› ‹(c₁, s₁) ⟹ s₂› ‹(WHILE b DO c₁, s₂) ⟹ t›
+        },
+        case IfFalse : {
+          cases' ‹(SKIP, s) ⟹ t›,
+          show (WHILE b DO c, t) ⟹ t, from  WhileFalse ‹¬↥(bval b t)› 
+        }
     }
 end
 
