@@ -428,7 +428,7 @@ begin
       show (x ::= a, s) ⟹ s[x ↦ aval a s], from Assign
     },
     case Seq1 : {
-      have : (SKIP, s) ⟹ s := Skip,
+      have : (SKIP, s) ⟹ s, from Skip,
       show (SKIP ;; c₂, s) ⟹ t, from Seq ‹(SKIP, s) ⟹ s› ‹(c₂, s) ⟹ t›
     },
     case Seq2 : {
@@ -456,6 +456,28 @@ begin
           show (WHILE b DO c, t) ⟹ t, from  WhileFalse ‹¬↥(bval b t)› 
         }
     }
+end
+
+lemma small_step_imp_big_step {c : com} {s t : pstate} :
+  (c, s)↝*(SKIP, t) → (c, s) ⟹ t :=
+begin
+  intros,
+  induction' ‹(c, s)↝*(SKIP, t)›,
+    case refl : t {
+      show (SKIP, t) ⟹ t, from Skip
+    },
+    case step : _ _ _ _ t _ _ _ {
+      show (c, s) ⟹ t, from step_case ‹(c, s)↝(c₁, s₁)› ‹(c₁, s₁) ⟹ t›
+    }
+end
+
+theorem big_step_equiv_small_step {c : com} {s t : pstate} :
+  (c, s) ⟹ t ↔ (c, s)↝*(SKIP, t) :=
+begin
+  intros,
+  apply iff.intro,
+    exact big_step_imp_small_step,
+    exact small_step_imp_big_step
 end
 
 end equivalence
