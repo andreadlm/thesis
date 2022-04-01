@@ -17,10 +17,10 @@ nell'esecuzione di un programma scritto in un dato linguaggio.
 
 ## Note di implementazione
 
-Questo file utilizza i tattici `cases'` e `induction'` definiti in `tactic.induction`. Nonostante le medesime
-dimostrazioni siano ottenibili tramite i tattici `cases` e `induction` standard, le due versioni qui utilizzate
-meglio si prestano all'utilizzo con predicati induttivi e sono più 'naturali' rispetto alla medesima
-dimostrazione svolta su carta.
+Questo file utilizza per alcune dimostrazioni i tattici `cases'` e `induction'` definiti in `tactic.induction`. 
+Nonostante le medesime dimostrazioni siano ottenibili tramite i tattici `cases` e `induction` standard, le due 
+versioni qui utilizzate meglio si prestano all'utilizzo con predicati induttivi e sono più 'naturali' rispetto alla
+medesima dimostrazione svolta su carta.
 
 ## Notazione
 
@@ -185,20 +185,18 @@ begin
           show  (IF b THEN (c ;; WHILE b DO c) ELSE SKIP, s) ⟹ s, from
             IfFalse ‹¬↥(bval b s)› Skip
         },
-        case WhileTrue : {
-          rename ᾰ_s₂ → s',
+        case WhileTrue : _ _ _ s₁ _ _ _ _ {
           show (IF b THEN (c ;; WHILE b DO c) ELSE SKIP, s) ⟹ t, from
-            IfTrue ‹↥(bval b s)› (Seq ‹(c, s) ⟹ s'› ‹(WHILE b DO c, s') ⟹ t›)
+            IfTrue ‹↥(bval b s)› (Seq ‹(c, s) ⟹ s₁› ‹(WHILE b DO c, s₁) ⟹ t›)
         }
     },
     {
       intros,
       cases ‹(IF b THEN (c ;; WHILE b DO c) ELSE SKIP, s) ⟹ t›,
         case IfTrue : {
-          cases ‹(c ;; WHILE b DO c, s) ⟹ t›,
-          rename ᾰ_ᾰ_1_s₂ → s',
+          cases ‹(c ;; WHILE b DO c, s) ⟹ t› with _ _ _ _ _ _ _ s₁,
           show (WHILE b DO c, s) ⟹ t, from
-            WhileTrue ‹↥(bval b s)› ‹(c, s) ⟹ s'› ‹(WHILE b DO c, s') ⟹ t›
+            WhileTrue ‹↥(bval b s)› ‹(c, s) ⟹ s₁› ‹(WHILE b DO c, s₁) ⟹ t›
         },
         case IfFalse : {
           cases ‹(SKIP, s) ⟹ t›,
@@ -220,41 +218,42 @@ begin
   intros,
   induction' ‹(c, s) ⟹ t›,
     case Skip : s { 
-      cases ‹(SKIP, s) ⟹ r›, 
+      cases' ‹(SKIP, s) ⟹ r›, 
       trivial 
     },
     case Assign : s x a { 
-      cases ‹(x ::= a, s) ⟹ r›, 
+      cases' ‹(x ::= a, s) ⟹ r›, 
       trivial 
     },
     case Seq : _ _ s s₁ _ _ _ ih₁ ih₂ {
-      cases ‹(c₁ ;; c₂, s) ⟹ r› with _ _ _ _ _ _ _ s₃ _,
-      have : (s₁ = s₃) := ih₁ ‹(c₁, s) ⟹ s₃›,
-      rw ‹s₁ = s₃› at *,
-      exact ih₂ ‹(c₂, s₃) ⟹ r›
+      cases' ‹(c₁ ;; c₂, s) ⟹ r› with _ _ _ _ _ _ s _ _,
+      have : (s₁ = s₂) := ih₁ ‹(c₁, s) ⟹ s₂›,
+      rw ‹s₁ = s₂› at *,
+      show t = r, from  ih₂ ‹(c₂, s₂) ⟹ r›
     },
     case IfTrue : {
-      cases ‹(IF b THEN c₁ ELSE c₂, s) ⟹ r›,
-        case IfTrue : { exact ih ‹(c₁, s) ⟹ r› },
+      cases' ‹(IF b THEN c₁ ELSE c₂, s) ⟹ r›,
+        case IfTrue : { show t = r, from ih ‹(c₁, s) ⟹ r› },
         case IfFalse : { trivial }
     },
     case IfFalse : {
-      cases ‹(IF b THEN c₁ ELSE c₂, s) ⟹ r›,
+      cases' ‹(IF b THEN c₁ ELSE c₂, s) ⟹ r›,
         case IfTrue : { trivial },
-        case IfFalse : { exact ih ‹(c₂, s) ⟹ r› }
+        case IfFalse : { show t = r, from ih ‹(c₂, s) ⟹ r› }
     },
     case WhileTrue : _ _ s s₁ _ _ _ _ ih₁ ih₂ {
-      cases ‹(WHILE b DO c, s) ⟹ r›,
-        case WhileTrue : _ _ _ s₂ _ _ _ _ { 
+      cases' ‹(WHILE b DO c, s) ⟹ r›,
+        case WhileTrue : _ _ s _ _ _ _ _ { 
           have : (s₁ = s₂) := ih₁ ‹(c, s) ⟹ s₂›,
           rw ←‹s₁ = s₂› at *,
-          exact ih₂ ‹(WHILE b DO c, s₁) ⟹ r›
+          show t = r, from ih₂ ‹(WHILE b DO c, s₁) ⟹ r›
         },
-        case WhileFalse : { contradiction }
+        case WhileFalse : { trivial  }
     },
     case WhileFalse : _ _ s _ { 
-      cases ‹(WHILE b DO c, s) ⟹ r›, 
-      all_goals { trivial }
+      cases' ‹(WHILE b DO c, s) ⟹ r›, 
+        case WhileTrue : { trivial },
+        case WhileFalse : { trivial }
     }
 end
 
@@ -327,7 +326,7 @@ begin
     case refl : c s { exact ‹(c, s)↝*(c₂, s₂)› },
     case step : c c₃ c₁ s s₃ s₁  _ _ ih {
       have : (c₃, s₃)↝*(c₂, s₂) := ih ‹(c₁, s₁)↝*(c₂, s₂)›,
-      exact step ‹(c, s)↝(c₃, s₃)› ‹(c₃, s₃)↝*(c₂, s₂)›
+      show (c, s)↝*(c₂, s₂), from step ‹(c, s)↝(c₃, s₃)› ‹(c₃, s₃)↝*(c₂, s₂)›
     }
 end
 
@@ -342,7 +341,7 @@ begin
     case refl : c s { exact step ‹(c, s)↝(c₂, s₂)› refl },
     case step : c c₃ c₁ s s₃ s₁ _ _ ih {
       have : (c₃, s₃)↝*(c₂, s₂) := ih ‹(c₁, s₁)↝(c₂, s₂)›,
-      exact step ‹(c, s)↝(c₃, s₃)› ‹(c₃, s₃)↝*(c₂, s₂)›
+      show (c, s)↝*(c₂, s₂), from step ‹(c, s)↝(c₃, s₃)› ‹(c₃, s₃)↝*(c₂, s₂)›
     }
 end 
 
@@ -353,7 +352,7 @@ begin
   cases st₁ with c₁ s₁,
   cases st₂ with c₂ s₂,
   intros,
-  exact step ‹(c, s)↝(c₁, s₁)› ‹(c₁, s₁)↝*(c₂, s₂)›
+  show (c, s)↝*(c₂, s₂), from step ‹(c, s)↝(c₁, s₁)› ‹(c₁, s₁)↝*(c₂, s₂)›
 end
 
 @[trans] lemma small_step_small_step_trans {st st₁ st₂: conf} :
@@ -365,7 +364,8 @@ begin
   intros,
   have : (c₁, s₁)↝*(c₁, s₁) := refl,
   have : (c, s)↝*(c₁, s₁) := step ‹(c, s)↝(c₁, s₁)› ‹(c₁, s₁)↝*(c₁, s₁)›,
-  exact small_step_star_small_step_trans ‹(c, s)↝*(c₁, s₁)› ‹(c₁, s₁)↝(c₂, s₂)›
+  show (c, s)↝*(c₂, s₂), from
+     small_step_star_small_step_trans ‹(c, s)↝*(c₁, s₁)› ‹(c₁, s₁)↝(c₂, s₂)›
 end
 
 section small_step_calc_ex
