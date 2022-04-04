@@ -494,8 +494,8 @@ begin
     case WhileTrue : _ _ s s₁ _ _ _ _ ih₁ ih₂ {
       calc
         (WHILE b DO c, s)↝ (IF b THEN c ;; WHILE b DO c ELSE SKIP, s) : While
-        ...              ↝ (c ;; WHILE b DO c, s)                     : IfTrue ‹↥(bval b s₁)›
-        ...              ↝*(SKIP ;; WHILE b DO c, s₁)                 : seq_star ‹(c, s₁)↝*(SKIP, s₂)›
+        ...              ↝ (c ;; WHILE b DO c, s)                     : IfTrue ‹↥(bval b s)›
+        ...              ↝*(SKIP ;; WHILE b DO c, s₁)                 : seq_star ‹(c, s)↝*(SKIP, s₁)›
         ...              ↝ (WHILE b DO c, s₁)                         : Seq1
         ...              ↝*(SKIP, t)                                  : ih₂
     },
