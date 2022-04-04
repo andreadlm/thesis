@@ -315,12 +315,12 @@ I seguenti lemmi sono puramente tecnici e utili alla configurazione dell'ambient
 
 open small_step_star
 
-@[trans] lemma small_step_star_small_step_star_trans {st st₁ st₂: conf} :
-  st ↝* st₁ → st₁ ↝* st₂ → st ↝* st₂ :=
+@[trans] lemma small_step_star_small_step_star_trans {cf cf₁ cf₂: conf} :
+  cf ↝* cf₁ → cf₁ ↝* cf₂ → cf ↝* cf₂ :=
 begin
-  cases st with c s,
-  cases st₁ with c₁ s₁,
-  cases st₂ with c₂ s₂,
+  cases cf with c s,
+  cases cf₁ with c₁ s₁,
+  cases cf₂ with c₂ s₂,
   intros,
   induction ‹(c, s)↝*(c₁, s₁)›,
     case refl : c s { exact ‹(c, s)↝*(c₂, s₂)› },
@@ -330,12 +330,12 @@ begin
     }
 end
 
-@[trans] lemma small_step_star_small_step_trans {st st₁ st₂: conf} :
-  st ↝* st₁ → st₁ ↝ st₂ → st ↝* st₂ :=
+@[trans] lemma small_step_star_small_step_trans {cf cf₁ cf₂: conf} :
+  cf ↝* cf₁ → cf₁ ↝ cf₂ → cf ↝* cf₂ :=
 begin
-  cases st with c s,
-  cases st₁ with c₁ s₁,
-  cases st₂ with c₂ s₂,
+  cases cf with c s,
+  cases cf₁ with c₁ s₁,
+  cases cf₂ with c₂ s₂,
   intros,
   induction ‹(c, s)↝*(c₁, s₁)›,
     case refl : c s { exact step ‹(c, s)↝(c₂, s₂)› refl },
@@ -345,22 +345,22 @@ begin
     }
 end 
 
-@[trans] lemma small_step_small_step_star_trans {st st₁ st₂: conf} :
-  st ↝ st₁ → st₁ ↝* st₂ → st ↝* st₂ :=
+@[trans] lemma small_step_small_step_star_trans {cf cf₁ cf₂: conf} :
+  cf ↝ cf₁ → cf₁ ↝* cf₂ → cf ↝* cf₂ :=
 begin
-  cases st with c s,
-  cases st₁ with c₁ s₁,
-  cases st₂ with c₂ s₂,
+  cases cf with c s,
+  cases cf₁ with c₁ s₁,
+  cases cf₂ with c₂ s₂,
   intros,
   show (c, s)↝*(c₂, s₂), from step ‹(c, s)↝(c₁, s₁)› ‹(c₁, s₁)↝*(c₂, s₂)›
 end
 
-@[trans] lemma small_step_small_step_trans {st st₁ st₂: conf} :
-  st ↝ st₁ → st₁ ↝ st₂ → st ↝* st₂ :=
+@[trans] lemma small_step_small_step_trans {cf cf₁ cf₂: conf} :
+  cf ↝ cf₁ → cf₁ ↝ cf₂ → cf ↝* cf₂ :=
 begin
-  cases st with c s, 
-  cases st₁ with c₁ s₁,
-  cases st₂ with c₂ s₂,
+  cases cf with c s, 
+  cases cf₁ with c₁ s₁,
+  cases cf₂ with c₂ s₂,
   intros,
   have : (c₁, s₁)↝*(c₁, s₁) := refl,
   have : (c, s)↝*(c₁, s₁) := step ‹(c, s)↝(c₁, s₁)› ‹(c₁, s₁)↝*(c₁, s₁)›,
