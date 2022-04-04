@@ -539,9 +539,9 @@ begin
     case While : {
       cases' ‹(IF b THEN (c ;; WHILE b DO c) ELSE SKIP, s) ⟹ t›,
         case IfTrue : {
-          cases' ‹(c ;; WHILE b DO c, s) ⟹ t›,
-          show (WHILE b DO c₁, s₁) ⟹ t, from
-            WhileTrue ‹↥(bval b s₁)› ‹(c₁, s₁) ⟹ s₂› ‹(WHILE b DO c₁, s₂) ⟹ t›
+          cases' ‹(c ;; WHILE b DO c, s) ⟹ t› with _ _ _ _ _ _ s s₁ _,
+          show (WHILE b DO c₁, s) ⟹ t, from
+            WhileTrue ‹↥(bval b s)› ‹(c₁, s) ⟹ s₁› ‹(WHILE b DO c₁, s₁) ⟹ t›
         },
         case IfFalse : {
           cases' ‹(SKIP, s) ⟹ t›,
