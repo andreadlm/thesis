@@ -474,30 +474,30 @@ begin
         ...         ↝*(SKIP, t[x ↦ aval a t]) : refl
 
     },
-    case Seq : _ _ _ _ _ _ _ ih₁ ih₂ {
+    case Seq : _ _ s s₁ _ _ _ ih₁ ih₂ {
       calc
-        (c₁ ;; c₂, s₁)↝*(SKIP ;; c₂, s₂) : seq_star ‹(c₁, s₁)↝*(SKIP, s₂)›
-        ...           ↝ (c₂, s₂)         : Seq1
-        ...           ↝*(SKIP, t)        : ih₂
+        (c₁ ;; c₂, s)↝*(SKIP ;; c₂, s₁) : seq_star ‹(c₁, s)↝*(SKIP, s₁)›
+        ...          ↝ (c₂, s₁)         : Seq1
+        ...          ↝*(SKIP, t)        : ih₂
       
     },
     case IfTrue : {
       calc
-        (IF b THEN c₁ ELSE c₂, s)↝(c₁, s)    : IfTrue ‹↥(bval b s)›
+        (IF b THEN c₁ ELSE c₂, s)↝ (c₁, s)   : IfTrue ‹↥(bval b s)›
         ...                      ↝*(SKIP, t) : ih
     },
     case IfFalse : {
       calc
-        (IF b THEN c₁ ELSE c₂, s)↝(c₂, s)    : IfFalse ‹¬↥(bval b s)›
+        (IF b THEN c₁ ELSE c₂, s)↝ (c₂, s)   : IfFalse ‹¬↥(bval b s)›
         ...                      ↝*(SKIP, t) : ih
     },
-    case WhileTrue : _ _ _ _ _ _ _ _ ih₁ ih₂ {
+    case WhileTrue : _ _ s s₁ _ _ _ _ ih₁ ih₂ {
       calc
-        (WHILE b DO c, s₁)↝ (IF b THEN c ;; WHILE b DO c ELSE SKIP, s₁) : While
-        ...               ↝ (c ;; WHILE b DO c, s₁)                     : IfTrue ‹↥(bval b s₁)›
-        ...               ↝*(SKIP ;; WHILE b DO c, s₂)                  : seq_star ‹(c, s₁)↝*(SKIP, s₂)›
-        ...               ↝ (WHILE b DO c, s₂)                          : Seq1
-        ...               ↝*(SKIP, t)                                   : ih₂
+        (WHILE b DO c, s)↝ (IF b THEN c ;; WHILE b DO c ELSE SKIP, s) : While
+        ...              ↝ (c ;; WHILE b DO c, s)                     : IfTrue ‹↥(bval b s₁)›
+        ...              ↝*(SKIP ;; WHILE b DO c, s₁)                 : seq_star ‹(c, s₁)↝*(SKIP, s₂)›
+        ...              ↝ (WHILE b DO c, s₁)                         : Seq1
+        ...              ↝*(SKIP, t)                                  : ih₂
     },
     case WhileFalse : {
       calc
