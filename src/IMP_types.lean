@@ -76,7 +76,7 @@ inductive tbval : bexp → pstate → bool → Prop
   taval a₂ s (Iv i₂) →
   tbval (Less a₁ a₂) s (i₁ < i₂)
 
-| tbvalLR {a₁ a₂ : aexp} {s : pstate} {r₁ r₂ : ℕ} :
+| tbvalLR {a₁ a₂ : aexp} {s : pstate} {r₁ r₂ : ℝ} :
   taval a₁ s (Rv r₁) →
   taval a₂ s (Rv r₂) →
   tbval (Less a₁ a₂) s (r₁ < r₂)
@@ -279,8 +279,8 @@ begin
     case Rv : r { exact ⟨r, rfl⟩ }
 end
 
-lemma progress_aexp {Γ : tyenv} {a : aexp} {τ : ty} {s : pstate} {v : val} :
-  (Γ ⊢ₐ a : τ) → (Γ ⊢ₛ s) → ∃ v, taval a s v :=
+lemma progress_aexp {Γ : tyenv} {a : aexp} {τ : ty} {s : pstate} :
+  (Γ ⊢ₐ a : τ) → (Γ ⊢ₛ s) → ∃ (v : val), taval a s v :=
 begin
   intros,
   induction' ‹(Γ ⊢ₐ a : τ)›,
@@ -294,11 +294,11 @@ begin
       show ∃ v, taval (V x) s v, from ⟨ (s x), tavalV ⟩ 
     },
     case atypeP : _ a₁ a₂ τ _ _ ih₁ ih₂ {
-      have : (∃ v₁, taval a₁ s v₁), from ih₁ ‹(Γ ⊢ₛ s)›,
-      cases ‹∃ v₁, taval a₁ s v₁› with v₁,
+      have : ∃ v, taval a₁ s v, from ih₁ ‹(Γ ⊢ₛ s)›,
+      cases ‹∃ v, taval a₁ s v› with v₁,
 
-      have : (∃ v₂, taval a₂ s v₂), from ih₂ ‹(Γ ⊢ₛ s)›,
-      cases ‹∃ v₂, taval a₂ s v₂› with v₂,
+      have : ∃ v, taval a₂ s v, from ih₂ ‹(Γ ⊢ₛ s)›,
+      cases ‹∃ v, taval a₂ s v› with v₂,
 
       have : type v₁ = τ, from 
         preservation_aexp ‹(Γ ⊢ₐ a₁ : τ)› ‹taval a₁ s v₁› ‹(Γ ⊢ₛ s)›,
@@ -332,4 +332,73 @@ begin
             ⟨ (Rv (r₁ + r₂)), tavalPR ‹taval a₁ s (Rv r₁)› ‹taval a₂ s (Rv r₂)› ⟩
         }
     },
+end
+
+lemma progress_bexp {Γ : tyenv} {b : bexp} {τ : ty} {s : pstate} :
+  (Γ ⊢₆ b) → (Γ ⊢ₛ s) → ∃ (v : bool), tbval b s v :=
+begin
+  intros,
+  induction' ‹(Γ ⊢₆ b)›,
+    case btypeC : {
+      show ∃ v, tbval (Bc bv) s v, from
+        ⟨ bv, tbvalC ⟩
+    },
+    case btypeN : {
+      have : ∃ v, tbval b s v, from ih ‹(Γ ⊢ₛ s)›,
+      cases ‹∃ v, tbval b s v› with bv,
+
+      show ∃ v, tbval (Not b) s v, from
+        ⟨ ¬bv, tbvalN ‹tbval b s bv› ⟩
+    },
+    case btypeA : _ b₁ b₂ _ _ ih₁ ih₂ { 
+      have : ∃ v, tbval b₁ s v, from ih₁ ‹(Γ ⊢ₛ s)›,
+      cases ‹∃ v, tbval b₁ s v› with bv₁,
+
+      have : ∃ v, tbval b₂ s v, from ih₂ ‹(Γ ⊢ₛ s)›,
+      cases ‹∃ v, tbval b₂ s v› with bv₂,
+
+      show ∃ v, tbval (And b₁ b₂) s v, from
+        ⟨ (bv₁ ∧ bv₂), tbvalA ‹tbval b₁ s bv₁› ‹tbval b₂ s bv₂› ⟩
+    },
+    case btypeL : _ _ _ τ _ _ { 
+      have : ∃ v, taval a₁ s v, from 
+        progress_aexp ‹(Γ ⊢ₐ a₁ : τ)› ‹(Γ ⊢ₛ s)›,
+      cases ‹∃ v, taval a₁ s v› with v₁,
+
+      have : ∃ v, taval a₂ s v, from 
+        progress_aexp ‹(Γ ⊢ₐ a₂ : τ)› ‹(Γ ⊢ₛ s)›,
+      cases ‹∃ v, taval a₂ s v› with v₂,
+
+      have : type v₁ = τ, from 
+        preservation_aexp ‹(Γ ⊢ₐ a₁ : τ)› ‹taval a₁ s v₁› ‹(Γ ⊢ₛ s)›,
+
+      have : type v₂ = τ, from
+        preservation_aexp ‹(Γ ⊢ₐ a₂ : τ)› ‹taval a₂ s v₂› ‹(Γ ⊢ₛ s)›,
+
+      cases τ,
+        case Ity : {
+          have : ∃ i, v₁ = (Iv i), from extract_Ity ‹type v₁ = Ity›,
+          cases ‹∃ i, v₁ = (Iv i)› with i₁,
+          rw[‹v₁ = Iv i₁›] at *,
+
+          have : ∃ i, v₂ = (Iv i), from extract_Ity ‹type v₂ = Ity›,
+          cases ‹∃ i, v₂ = (Iv i)› with i₂,
+          rw[‹v₂ = Iv i₂›] at *,
+
+          show ∃ v, tbval (Less a₁ a₂) s v, from
+            ⟨ (i₁ < i₂), tbvalLI ‹taval a₁ s (Iv i₁)› ‹taval a₂ s (Iv i₂)› ⟩
+        },
+        case Rty : {
+          have : ∃ r, v₁ = (Rv r), from extract_Rty ‹type v₁ = Rty›,
+          cases ‹∃ r, v₁ = (Rv r)› with r₁,
+          rw[‹v₁ = Rv r₁›] at *,
+
+          have : ∃ r, v₂ = (Rv r), from extract_Rty ‹type v₂ = Rty›,
+          cases ‹∃ r, v₂ = (Rv r)› with r₂,
+          rw[‹v₂ = Rv r₂›] at *,
+
+          show ∃ v, tbval (Less a₁ a₂) s v, from
+            ⟨ (r₁ < r₂), tbvalLR ‹taval a₁ s (Rv r₁)› ‹taval a₂ s (Rv r₂)› ⟩
+        }
+    }
 end
