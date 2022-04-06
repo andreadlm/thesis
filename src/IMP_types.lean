@@ -1,3 +1,4 @@
+import tactic.induction
 import data.real.basic
 
 abbreviation vname := string
@@ -42,7 +43,7 @@ inductive taval : aexp → pstate → val → Prop
   taval a₂ s (Iv i₂) →
   taval (Plus a₁ a₂) s (Iv (i₁ + i₂))
 
-| tavalRI {a₁ a₂ : aexp} {s : pstate} {r₁ r₂ : ℝ} :
+| tavalPR {a₁ a₂ : aexp} {s : pstate} {r₁ r₂ : ℝ} :
   taval a₁ s (Rv r₁) →
   taval a₂ s (Rv r₂) →
   taval (Plus a₁ a₂) s (Rv (r₁ + r₂))
@@ -163,7 +164,7 @@ inductive atyping : tyenv → aexp → ty → Prop
   atyping Γ a₂ τ →
   atyping Γ (Plus a₁ a₂) τ
 
-notation Γ `⊢ₐ` a `:` τ := atyping Γ a τ
+notation Γ ` ⊢ₐ ` a ` : ` τ := atyping Γ a τ
 
 inductive btyping : tyenv → bexp → Prop
 | btypeC {Γ : tyenv} {bv : bool} :
@@ -183,7 +184,7 @@ inductive btyping : tyenv → bexp → Prop
   atyping Γ a₂ τ →
   btyping Γ (Less a₁ a₂)
 
-notation Γ `⊢₆` b := btyping Γ b
+notation Γ ` ⊢₆ ` b := btyping Γ b
 
 inductive ctyping : tyenv → com → Prop
 | ctypeSKIP {Γ : tyenv} :
@@ -209,3 +210,126 @@ inductive ctyping : tyenv → com → Prop
   ctyping Γ c →
   ctyping Γ (WHILE b DO c)
 
+notation Γ ` ⊢ ` c := ctyping Γ c
+
+def type : val → ty
+| (Iv i) := Ity
+| (Rv r) := Rty
+
+-- TODO: definizione più strutturata?
+notation Γ ` ⊢ₛ ` s := ∀ {x : vname}, type (s x) = Γ x
+
+lemma preservation_aexp {Γ : tyenv} {a : aexp} {τ : ty} {s : pstate} {v : val} : 
+  (Γ ⊢ₐ a : τ) → taval a s v → (Γ ⊢ₛ s) → type v = τ :=
+begin
+  intros,
+  induction' ‹(Γ ⊢ₐ a : τ)›,
+    case atypeI : {
+      cases ‹taval (Ic i) s v›,
+      trivial
+    },
+    case atypeR : {
+      cases ‹taval (Rc r) s v›,
+      trivial
+    },
+    case atypeV : {
+      cases ‹taval (V x) s v›,
+      apply ‹(Γ ⊢ₛ s)›
+    },
+    case atypeP : _ a₁ a₂ τ _ _ ih₁ ih₂ {
+      cases ‹taval (Plus a₁ a₂) s v›,
+        case tavalPI : _ _ _ i₁ i₂ _ _ { 
+          have : τ = Ity, {
+            have : type (Iv i₁) = τ, from ih₁ ‹taval a₁ s (Iv i₁)› ‹(Γ ⊢ₛ s)›,
+            rw[type] at this,
+            symmetry,
+            assumption
+          },
+          rw[‹τ = Ity›],
+          trivial
+        },
+        case tavalPR : _ _ _ r₁ r₂ _ _ {
+          have : τ = Rty, {
+            have : type (Rv r₁) = τ, from ih₁ ‹taval a₁ s (Rv r₁)› ‹(Γ ⊢ₛ s)›,
+            rw[type] at this,
+            symmetry,
+            assumption
+          },
+          rw[‹τ = Rty›],
+          trivial
+        }
+    }
+end
+
+lemma extract_Ity {v : val} :
+  (type v = Ity) → ∃ i, v = (Iv i) :=
+begin
+  intro,
+  cases v,
+    case Iv : i { exact ⟨i, rfl⟩ },
+    case Rv : { contradiction }
+end
+
+lemma extract_Rty {v : val} :
+  (type v = Rty) → ∃ r, v = (Rv r) :=
+begin
+  intro,
+  cases v,
+    case Iv : { contradiction },
+    case Rv : r { exact ⟨r, rfl⟩ }
+end
+
+lemma progress_aexp {Γ : tyenv} {a : aexp} {τ : ty} {s : pstate} {v : val} :
+  (Γ ⊢ₐ a : τ) → (Γ ⊢ₛ s) → ∃ v, taval a s v :=
+begin
+  intros,
+  induction' ‹(Γ ⊢ₐ a : τ)›,
+    case atypeI : { 
+      show ∃ v, taval (Ic i) s v, from ⟨ (Iv i), tavalI ⟩ 
+    },
+    case atypeR : { 
+      show ∃ v, taval (Rc r) s v, from ⟨ (Rv r), tavalR ⟩ 
+    },
+    case atypeV : { 
+      show ∃ v, taval (V x) s v, from ⟨ (s x), tavalV ⟩ 
+    },
+    case atypeP : _ a₁ a₂ τ _ _ ih₁ ih₂ {
+      have : (∃ v₁, taval a₁ s v₁), from ih₁ ‹(Γ ⊢ₛ s)›,
+      cases ‹∃ v₁, taval a₁ s v₁› with v₁,
+
+      have : (∃ v₂, taval a₂ s v₂), from ih₂ ‹(Γ ⊢ₛ s)›,
+      cases ‹∃ v₂, taval a₂ s v₂› with v₂,
+
+      have : type v₁ = τ, from 
+        preservation_aexp ‹(Γ ⊢ₐ a₁ : τ)› ‹taval a₁ s v₁› ‹(Γ ⊢ₛ s)›,
+
+      have : type v₂ = τ, from
+        preservation_aexp ‹(Γ ⊢ₐ a₂ : τ)› ‹taval a₂ s v₂› ‹(Γ ⊢ₛ s)›,
+
+      cases τ,
+        case Ity : {
+          have : ∃ i₁, v₁ = (Iv i₁), from extract_Ity ‹type v₁ = Ity›,
+          cases ‹∃ i₁, v₁ = (Iv i₁)› with i₁,
+          rw[‹v₁ = Iv i₁›] at *,
+
+          have : ∃ i₂, v₂ = (Iv i₂), from extract_Ity ‹type v₂ = Ity›,
+          cases ‹∃ i₂, v₂ = (Iv i₂)› with i₂,
+          rw[‹v₂ = Iv i₂›] at *,
+
+          show ∃ v, taval (Plus a₁ a₂) s v, from 
+            ⟨ (Iv (i₁ + i₂)), tavalPI ‹taval a₁ s (Iv i₁)› ‹taval a₂ s (Iv i₂)› ⟩
+        },
+        case Rty : {
+          have : ∃ r₁, v₁ = (Rv r₁), from extract_Rty ‹type v₁ = Rty›,
+          cases ‹∃ r₁, v₁ = (Rv r₁)› with r₁,
+          rw[‹v₁ = Rv r₁›] at *,
+
+          have : ∃ r₂, v₂ = (Rv r₂), from extract_Rty ‹type v₂ = Rty›,
+          cases ‹∃ r₂, v₂ = (Rv r₂)› with r₂,
+          rw[‹v₂ = Rv r₂›] at *,
+
+          show ∃ v, taval (Plus a₁ a₂) s v, from 
+            ⟨ (Rv (r₁ + r₂)), tavalPR ‹taval a₁ s (Rv r₁)› ‹taval a₂ s (Rv r₂)› ⟩
+        }
+    },
+end
