@@ -166,6 +166,8 @@ inductive atyping : tyenv → aexp → ty → Prop
 
 notation Γ ` ⊢ₐ ` a ` : ` τ := atyping Γ a τ
 
+open atyping
+
 inductive btyping : tyenv → bexp → Prop
 | btypeC {Γ : tyenv} {bv : bool} :
   btyping Γ (Bc bv)
@@ -186,31 +188,35 @@ inductive btyping : tyenv → bexp → Prop
 
 notation Γ ` ⊢₆ ` b := btyping Γ b
 
+open btyping
+
 inductive ctyping : tyenv → com → Prop
 | ctypeSKIP {Γ : tyenv} :
   ctyping Γ SKIP
 
-| ctypingAssign {Γ : tyenv} {a : aexp} {x : vname} :
+| ctypeAssign {Γ : tyenv} {a : aexp} {x : vname} :
   (Γ ⊢ₐ a : (Γ x)) →
   ctyping Γ (x ::= a)
 
-| ctypingSeq {Γ : tyenv} {c₁ c₂ : com} :
+| ctypeSeq {Γ : tyenv} {c₁ c₂ : com} :
   ctyping Γ c₁ →
   ctyping Γ c₂ →
   ctyping Γ (c₁ ;; c₂)
 
-| ctypingIf {Γ : tyenv} {b : bexp} {c₁ c₂ : com} :
+| ctypeIf {Γ : tyenv} {b : bexp} {c₁ c₂ : com} :
   (Γ ⊢₆ b) →
   ctyping Γ c₁ →
   ctyping Γ c₂ →
   ctyping Γ (IF b THEN c₁ ELSE c₂)
 
-| ctypingWhile {Γ : tyenv} {b : bexp} {c : com} :
+| ctypeWhile {Γ : tyenv} {b : bexp} {c : com} :
   (Γ ⊢₆ b) →
   ctyping Γ c →
   ctyping Γ (WHILE b DO c)
 
-notation Γ ` ⊢ ` c := ctyping Γ c
+notation Γ ` ⊢. ` c := ctyping Γ c
+
+open ctyping
 
 def type : val → ty
 | (Iv i) := Ity
@@ -400,5 +406,43 @@ begin
           show ∃ v, tbval (Less a₁ a₂) s v, from
             ⟨ (r₁ < r₂), tbvalLR ‹taval a₁ s (Rv r₁)› ‹taval a₂ s (Rv r₂)› ⟩
         }
+    }
+end
+
+theorem preservation_com {Γ : tyenv} {c c' : com} {s s' : pstate } :
+  (Γ ⊢. c) → (c, s)↝(c', s') → (Γ ⊢. c') :=
+begin
+  intros,
+  induction' ‹(Γ ⊢. c)›,
+    case ctypeSKIP : {
+      cases ‹(SKIP, s)↝(c', s')› -- impossibile
+    },
+    case ctypeAssign : {
+      cases' ‹(x ::= a, s)↝(c', s')›,
+      
+      show (Γ ⊢. SKIP), from ctypeSKIP
+    },
+    case ctypeSeq : _ c₁ c₂ _ _ ih₁ ih₂ {
+      cases' ‹(c₁ ;; c₂, s)↝(c', s')›,
+        case Seq1 : { assumption },
+        case Seq2 : {
+          have : (Γ ⊢. c₁'), from ih₁ ‹(c₁, s)↝(c₁', s')›,
+
+          show (Γ ⊢. c₁' ;; c₂), from ctypeSeq ‹(Γ ⊢. c₁')› ‹(Γ ⊢. c₂)›
+        }
+    },
+    case ctypeIf : _ _ c₁ c₂ _ _ _ ih₁ ih₂ { 
+      cases' ‹(IF b THEN c₁ ELSE c₂, s)↝(c', s')›,
+        case IfTrue : { assumption },
+        case IfFalse : { assumption } 
+    },
+    case ctypeWhile : {
+      cases' ‹(WHILE b DO c, s)↝(c', s')›,
+
+      have : (Γ ⊢. WHILE b DO c), from ctypeWhile ‹(Γ ⊢₆ b)› ‹(Γ ⊢. c)›,
+      have : (Γ ⊢. c ;; WHILE b DO c), from ctypeSeq ‹(Γ ⊢. c)› ‹(Γ ⊢. WHILE b DO c)›,
+
+      show (Γ ⊢. IF b THEN (c ;; WHILE b DO c) ELSE SKIP), from
+        ctypeIf ‹(Γ ⊢₆ b)› ‹(Γ ⊢. c ;; WHILE b DO c)› ctypeSKIP
     }
 end
