@@ -3,8 +3,6 @@ Authore: Andrea Delmastro
 -/
 
 import tactic.induction
-import IMP
-open com
 
 /-!
 # Semantica per IMP
@@ -40,6 +38,72 @@ medesima dimostrazione svolta su carta.
 
 * [Nipkow, Klein, Concrete Semantics with Isabelle/HOL][Nipkow]
 -/
+
+abbreviation vname  := string
+abbreviation val    := ℕ
+abbreviation pstate := vname → val
+
+/-!
+### Espressioni aritmetiche
+Sintassi e valutazione
+-/
+
+inductive aexp : Type
+| N    : ℕ → aexp
+| V    : vname → aexp
+| Plus : aexp → aexp → aexp
+
+open aexp
+
+def aval : aexp → pstate → val
+| (N n)        _ := n
+| (V x)        s := s x
+| (Plus a₁ a₂) s := (aval a₁ s) + (aval a₂ s)
+
+def state_update (s : pstate) (x : vname) (v : val) : pstate :=
+  λ y, if (y = x) then v else s y
+
+notation s `[` x ` ↦ ` v `]`:100 := state_update s x v
+notation   `[` x ` ↦ ` v `]` := (λ _, 0 ) [x ↦ v]
+
+/-!
+### Espressioni booleane
+Sintassi e valutazione
+-/
+
+inductive bexp : Type
+| Bc   : bool → bexp
+| Not  : bexp → bexp
+| And  : bexp → bexp → bexp
+| Less : aexp → aexp → bexp
+
+open bexp
+
+def bval : bexp → pstate → bool
+| (Bc v)       _ := v
+| (Not b)      s := ¬(bval b s)
+| (And b₁ b₂)  s := (bval b₁ s) ∧ (bval b₂ s)
+| (Less a₁ a₂) s := (aval a₁ s) < (aval a₂ s)
+
+/-!
+### Sintassi per il linguaggio di programmazione IMP
+-/
+
+inductive com : Type
+| SKIP   : com
+| Assign : vname → aexp → com
+| Seq    : com → com → com
+| If     : bexp → com → com → com
+| While  : bexp → com → com
+
+infix ` ::= `:68                                    := com.Assign
+infix ` ;; `:67                                     := com.Seq
+notation `IF `:0 b ` THEN `:0 c₁ ` ELSE `:68 c₂:68  := com.If b c₁ c₂
+notation `WHILE `:0 b ` DO `:68 c:68                := com.While b c
+
+abbreviation conf := com × pstate
+
+open com
 
 /-!
 ### Semantica operazionale big-step di IMP
