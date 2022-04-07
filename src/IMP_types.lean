@@ -523,7 +523,7 @@ begin
 end
 
 theorem progress_com {Γ : tyenv} {c : com} { s: pstate} :
-  (Γ ⊢. c) → (Γ ⊢ₛ s) → ¬(c = SKIP) → ∃ (cf : conf), (c, s)↝cf :=
+  (Γ ⊢. c) → (Γ ⊢ₛ s) → ¬(c = SKIP) → ∃ (cs' : conf), (c, s)↝cs' :=
 begin
   intros,
   induction' ‹(Γ ⊢. c)›,
@@ -534,7 +534,7 @@ begin
       have : ∃ v, taval a s v, from progress_aexp ‹(Γ ⊢ₐ a : Γ x)› ‹(Γ ⊢ₛ s)›,
       cases' ‹∃ v, taval a s v› with v,
 
-      show ∃ cf, (x ::= a, s)↝cf, from
+      show ∃ cs', (x ::= a, s)↝cs', from
         ⟨ (SKIP,  s[x ↦ v]), Assign ‹taval a s v› ⟩
     },
     case ctypeSeq : _ c₁ c₂ _ _ ih₁ ih₂ {
@@ -544,14 +544,14 @@ begin
         case or.inl : { -- c₁ = SKIP
           rw[‹c₁ = SKIP›] at *,
           
-          show ∃ cf, (SKIP ;; c₂, s)↝cf, from ⟨ (c₂, s), Seq1 ⟩
+          show ∃ cs', (SKIP ;; c₂, s)↝cs', from ⟨ (c₂, s), Seq1 ⟩
         },
         case or.inr : { -- ¬(c₁ = SKIP) 
-          have : ∃ cf, (c₁, s)↝cf, from ih₁ ‹(Γ ⊢ₛ s)› ‹¬(c₁ = SKIP)›,
-          cases' ‹∃ cf, (c₁, s)↝cf› with cf,
-          cases' cf with c₁' s',
+          have : ∃ cs', (c₁, s)↝cs', from ih₁ ‹(Γ ⊢ₛ s)› ‹¬(c₁ = SKIP)›,
+          cases' ‹∃ cs', (c₁, s)↝cs'› with cs',
+          cases' cs' with c₁' s',
           
-          show ∃ cf, (c₁ ;; c₂, s)↝cf, from
+          show ∃ cs', (c₁ ;; c₂, s)↝cs', from
             ⟨ (c₁';; c₂, s'), Seq2 ‹(c₁, s)↝(c₁', s')› ⟩
         }
     },
@@ -561,16 +561,37 @@ begin
 
       cases' bv,
         case tt : {
-          show ∃ cf, (IF b THEN c₁ ELSE c₂, s)↝cf, from
+          show ∃ cs', (IF b THEN c₁ ELSE c₂, s)↝cs', from
             ⟨ (c₁, s), IfTrue ‹tbval b s tt› ⟩
         },
         case ff : {
-          show ∃ cf, (IF b THEN c₁ ELSE c₂, s)↝cf, from
+          show ∃ cs', (IF b THEN c₁ ELSE c₂, s)↝cs', from
             ⟨ (c₂, s), IfFalse ‹tbval b s ff› ⟩
         }
     },
     case ctypeWhile : {
-       show ∃ cf, (WHILE b DO c, s)↝cf, from
+       show ∃ cs', (WHILE b DO c, s)↝cs', from
         ⟨ (IF b THEN c ;; WHILE b DO c ELSE SKIP, s), While ⟩
+    }
+end
+
+theorem type_soundness {Γ : tyenv} {c c' : com} {s s' : pstate} {cs'' : conf} :
+  (c, s)↝*(c', s') → (Γ ⊢. c) → (Γ ⊢ₛ s) → ¬(c' = SKIP) → ∃ (cs'' : conf), (c', s')↝cs'':=
+begin
+  intros,
+  induction' ‹(c, s)↝*(c', s')›,
+    case refl : {
+      show ∃ cs'', (c, s)↝cs'', from
+        progress_com ‹(Γ ⊢. c)› ‹(Γ ⊢ₛ s)› ‹¬(c = SKIP)›
+    },
+    case step : _ c₃ c' _ s₃ s' _ _ _ {
+      have : (Γ ⊢. c₃), from 
+        preservation_com ‹(Γ ⊢. c)› ‹(c, s)↝(c₃, s₃)›,
+
+      have : (Γ ⊢ₛ s₃), from 
+        preservation_state ‹(Γ ⊢. c)› ‹(Γ ⊢ₛ s)› ‹(c, s)↝(c₃, s₃)›,
+
+      show ∃ cs'', (c', s')↝cs'', from
+        ih ‹(Γ ⊢. c₃)› ‹(Γ ⊢ₛ s₃)› ‹¬(c' = SKIP)› 
     }
 end
