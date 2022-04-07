@@ -358,7 +358,7 @@ begin
     },
 end
 
-lemma progress_bexp {Γ : tyenv} {b : bexp} {τ : ty} {s : pstate} :
+lemma progress_bexp {Γ : tyenv} {b : bexp} {s : pstate} :
   (Γ ⊢₆ b) → (Γ ⊢ₛ s) → ∃ (v : bool), tbval b s v :=
 begin
   intros,
@@ -519,5 +519,58 @@ begin
       cases' ‹(WHILE b DO c, s)↝(c', s')›,
 
       show (Γ ⊢ₛ s), by assumption 
+    }
+end
+
+theorem progress_com {Γ : tyenv} {c : com} { s: pstate} :
+  (Γ ⊢. c) → (Γ ⊢ₛ s) → ¬(c = SKIP) → ∃ (cf : conf), (c, s)↝cf :=
+begin
+  intros,
+  induction' ‹(Γ ⊢. c)›,
+    case ctypeSKIP : { 
+      contradiction 
+    },
+    case ctypeAssign : {
+      have : ∃ v, taval a s v, from progress_aexp ‹(Γ ⊢ₐ a : Γ x)› ‹(Γ ⊢ₛ s)›,
+      cases' ‹∃ v, taval a s v› with v,
+
+      show ∃ cf, (x ::= a, s)↝cf, from
+        ⟨ (SKIP,  s[x ↦ v]), Assign ‹taval a s v› ⟩
+    },
+    case ctypeSeq : _ c₁ c₂ _ _ ih₁ ih₂ {
+      have : (c₁ = SKIP) ∨ ¬(c₁ = SKIP), from em (c₁ = SKIP),
+
+      cases' ‹(c₁ = SKIP) ∨ ¬(c₁ = SKIP)›,
+        case or.inl : { -- c₁ = SKIP
+          rw[‹c₁ = SKIP›] at *,
+          
+          show ∃ cf, (SKIP ;; c₂, s)↝cf, from ⟨ (c₂, s), Seq1 ⟩
+        },
+        case or.inr : { -- ¬(c₁ = SKIP) 
+          have : ∃ cf, (c₁, s)↝cf, from ih₁ ‹(Γ ⊢ₛ s)› ‹¬(c₁ = SKIP)›,
+          cases' ‹∃ cf, (c₁, s)↝cf› with cf,
+          cases' cf with c₁' s',
+          
+          show ∃ cf, (c₁ ;; c₂, s)↝cf, from
+            ⟨ (c₁';; c₂, s'), Seq2 ‹(c₁, s)↝(c₁', s')› ⟩
+        }
+    },
+    case ctypeIf : _ _ c₁ c₂ _ _ _ ih₁ ih₂ {
+      have : ∃ v, tbval b s v, from progress_bexp ‹(Γ ⊢₆ b)› ‹(Γ ⊢ₛ s)›,
+      cases' ‹∃ v, tbval b s v› with bv,
+
+      cases' bv,
+        case tt : {
+          show ∃ cf, (IF b THEN c₁ ELSE c₂, s)↝cf, from
+            ⟨ (c₁, s), IfTrue ‹tbval b s tt› ⟩
+        },
+        case ff : {
+          show ∃ cf, (IF b THEN c₁ ELSE c₂, s)↝cf, from
+            ⟨ (c₂, s), IfFalse ‹tbval b s ff› ⟩
+        }
+    },
+    case ctypeWhile : {
+       show ∃ cf, (WHILE b DO c, s)↝cf, from
+        ⟨ (IF b THEN c ;; WHILE b DO c ELSE SKIP, s), While ⟩
     }
 end
