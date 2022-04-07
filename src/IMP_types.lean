@@ -17,6 +17,24 @@ def state_update (s : pstate) (x : vname) (v : val) : pstate :=
 notation s `[` x ` ↦ ` v `]`:100 := state_update s x v
 notation   `[` x ` ↦ ` v `]`     := (λ _, (Iv 0)) [x ↦ v]
 
+@[simp] def apply_state_update_pos {x y : vname} {s : pstate} {v : val} :
+  (y = x) → s[x ↦ v] y = v := 
+begin
+  intro,
+  dsimp[state_update],
+  apply if_pos,
+  assumption
+end
+
+@[simp] def apply_state_update_neg {x y : vname} {s : pstate} {v : val} :
+  ¬(y = x) → s[x ↦ v] y = (s y) :=
+begin
+  intro,
+  dsimp[state_update],
+  apply if_neg,
+  assumption
+end
+
 #check ["x" ↦ (Iv 7)]
 #check ["x" ↦ (val.Iv 7)]["y" ↦ (val.Rv 4.5)] "x"
 
@@ -223,7 +241,7 @@ def type : val → ty
 | (Rv r) := Rty
 
 -- TODO: definizione più strutturata?
-notation Γ ` ⊢ₛ ` s := ∀ {x : vname}, type (s x) = Γ x
+notation Γ ` ⊢ₛ ` s := ∀ (y : vname), type (s y) = Γ y
 
 lemma preservation_aexp {Γ : tyenv} {a : aexp} {τ : ty} {s : pstate} {v : val} : 
   (Γ ⊢ₐ a : τ) → taval a s v → (Γ ⊢ₛ s) → type v = τ :=
@@ -419,7 +437,7 @@ begin
     },
     case ctypeAssign : {
       cases' ‹(x ::= a, s)↝(c', s')›,
-      
+
       show (Γ ⊢. SKIP), from ctypeSKIP
     },
     case ctypeSeq : _ c₁ c₂ _ _ ih₁ ih₂ {
@@ -444,5 +462,62 @@ begin
 
       show (Γ ⊢. IF b THEN (c ;; WHILE b DO c) ELSE SKIP), from
         ctypeIf ‹(Γ ⊢₆ b)› ‹(Γ ⊢. c ;; WHILE b DO c)› ctypeSKIP
+    }
+end
+
+theorem preservation_state {Γ : tyenv} {c c' : com} {s s' : pstate } :
+  (Γ ⊢. c) → (Γ ⊢ₛ s) → (c, s)↝(c', s') → (Γ ⊢ₛ s') :=
+begin
+  intro, intro, intro,
+  induction' ‹(Γ ⊢. c)›,
+    case ctypeSKIP : {
+      cases' ‹(SKIP, s)↝(c', s')› -- impossibile
+    },
+    case ctypeAssign : _ _ x _ {
+      cases' ‹(x ::= a, s)↝(c', s')› with _ x _ _ _,
+
+      have : type v = Γ x, from
+        preservation_aexp ‹(Γ ⊢ₐ a : Γ x)› ‹taval a s v› ‹(Γ ⊢ₛ s)›,
+
+      assume y : vname,
+      have : (y = x) ∨ ¬(y = x), from em (y = x),
+
+      cases' ‹(y = x) ∨ ¬(y = x)›,
+        case or.inl : { -- y = x
+          have : (s[x ↦ v] y) = v, by simp[‹y = x›],
+          rw[‹(s[x ↦ v] y) = v›, ‹y = x›],
+          
+          show type v = Γ x , by assumption
+        },
+        case or.inr : { -- ¬(y = x)
+          have : (s[x ↦ v] y) = s y, by simp[‹¬y = x›],
+          rw[‹s[x ↦ v] y = s y›],
+
+          show type (s y) = Γ y, from ‹(Γ ⊢ₛ s)› y
+        }
+
+    },
+    case ctypeSeq : _ c₁ c₂ _ _ ih₁ ih₂ {
+      cases' ‹(c₁ ;; c₂, s)↝(c', s')›,
+        case Seq1 : {
+          show (Γ ⊢ₛ s), by assumption
+        },
+        case Seq2 : {
+          show (Γ ⊢ₛ s'), from ih₁ ‹(Γ ⊢ₛ s)› ‹(c₁, s)↝(c₁', s')›,
+        }
+    },
+    case ctypeIf : _ _ c₁ c₂ _ _ _ ih₁ ih₂ { 
+      cases' ‹(IF b THEN c₁ ELSE c₂, s)↝(c', s')›,
+        case IfTrue : {
+          show (Γ ⊢ₛ s), by assumption
+        },
+        case IfFalse : {
+          show (Γ ⊢ₛ s), by assumption
+        }
+    },
+    case ctypeWhile : {
+      cases' ‹(WHILE b DO c, s)↝(c', s')›,
+
+      show (Γ ⊢ₛ s), by assumption 
     }
 end
