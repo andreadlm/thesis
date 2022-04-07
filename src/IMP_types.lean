@@ -35,9 +35,6 @@ begin
   assumption
 end
 
-#check ["x" ↦ (Iv 7)]
-#check ["x" ↦ (val.Iv 7)]["y" ↦ (val.Rv 4.5)] "x"
-
 inductive aexp : Type
 | Ic   : ℕ → aexp
 | Rc   : ℝ → aexp
