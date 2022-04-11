@@ -1,5 +1,46 @@
+/-
+Authore: Andrea Delmastro
+-/
+
 import tactic.induction
 import data.real.basic
+
+/-!
+# Tipi semplici per IMP
+
+Questo file definisce un semplice sistema di tipi per il linguaggio di programmazione IMP e dimostra la
+correttezza utilizzando la semantica small-step. Viene in particolare dimostrata la proprietà di safety:
+se c è un comando ben tipato che viene eseguito in uno stato coerente con le dichiarazioni dei tipi delle 
+sue variabili allora l'esecuzione non si blocca prima di raggiungere un valore (se esiste).
+
+Il linguaggio di programmazione IMP viene esteso e ridefinito per comprendere due tipi di valori (interi 
+e reali).
+
+## Note di implementazione
+
+Questo file utilizza per alcune dimostrazioni i tattici `cases'` e `induction'` definiti in `tactic.induction`. 
+Nonostante le medesime dimostrazioni siano ottenibili tramite i tattici `cases` e `induction` standard, le due 
+versioni qui utilizzate meglio si prestano all'utilizzo con predicati induttivi e sono più 'naturali' rispetto alla
+medesima dimostrazione svolta su carta.
+
+## Notazione
+
+* `vname` : nome di variabile, `string`
+* `val` : valore di un'espressione, `ℕ`
+* `pstate` : stato di programma, funzione da `vname` a `val`
+* `s[x ↦ v]` : aggiornamento dello stato `s`, con assegnazione di `v` a `x`
+* `::=` : comando di assegnamento
+* `;;` : concatenazione sequenziale di comandi
+* `conf` : configurazione, coppia `com × pstate`
+* `⟹` : relazione big-step
+* `∼` : equivalenza di comandi
+* `↝` : riduzione small-step
+* `↝*` : chiusura riflessiva e transitiva di `↝`
+
+## Riferimenti
+
+* [Nipkow, Klein, Concrete Semantics with Isabelle/HOL][Nipkow] cap. 9 par. 9.1
+-/
 
 abbreviation vname := string
 
@@ -17,6 +58,9 @@ def state_update (s : pstate) (x : vname) (v : val) : pstate :=
 notation s `[` x ` ↦ ` v `]`:100 := state_update s x v
 notation   `[` x ` ↦ ` v `]`     := (λ _, (Iv 0)) [x ↦ v]
 
+/--
+Lemma tecnico utile all'utilizzo del tattico `simp` per l'applicazione degli stati
+-/
 @[simp] def apply_state_update_pos {x y : vname} {s : pstate} {v : val} :
   (y = x) → s[x ↦ v] y = v := 
 begin
@@ -26,6 +70,9 @@ begin
   assumption
 end
 
+/--
+Lemma tecnico utile all'utilizzo del tattico `simp` per l'applicazione degli stati
+-/
 @[simp] def apply_state_update_neg {x y : vname} {s : pstate} {v : val} :
   ¬(y = x) → s[x ↦ v] y = (s y) :=
 begin
@@ -35,6 +82,11 @@ begin
   assumption
 end
 
+/-!
+### Espressioni aritmetiche
+Le espressioni aritmentiche prevedono due tipi di costanti: intere e reali.
+-/
+
 inductive aexp : Type
 | Ic   : ℕ → aexp
 | Rc   : ℝ → aexp
@@ -42,6 +94,15 @@ inductive aexp : Type
 | Plus : aexp → aexp → aexp
 
 open aexp
+
+/-!
+### Valutazione di espressioni aritmetiche
+La valutazione delle espressioni aritmetiche è ora una funzione parziale: solo le espressioni ben formate
+(quelle in cui non vengono sommate tra di loro espressioni con tipo dei valori differenti) hanno senso.
+La valutazione viene quindi definita tramite predicati induttivi, dove una espressione viene messa in relazione
+al suo valore. I casi non ben formati non vengono definiti: in questo modo non esiterà una valutazione entro
+il sistema di tali espressioni.
+-/
 
 inductive taval : aexp → pstate → val → Prop
 | tavalI {i : ℕ} {s : pstate} : 
@@ -65,6 +126,10 @@ inductive taval : aexp → pstate → val → Prop
 
 open taval
 
+/-!
+### Espressioni booleane
+-/
+
 inductive bexp : Type
 | Bc   : bool → bexp
 | Not  : bexp → bexp
@@ -72,6 +137,16 @@ inductive bexp : Type
 | Less : aexp → aexp → bexp
 
 open bexp
+
+/-!
+### Valutazione di espressioni booleane
+La valutazione delle espressioni booleane è ora una funzione parziale: solo le espressioni ben formate
+(quelle in cui non vengono confrontate tra di loro espressioni con tipo dei valori differenti) hanno senso.
+La valutazione viene quindi definita tramite predicati induttivi, dove una espressione viene messa in relazione
+al suo valore. I casi non ben formati non vengono definiti: in questo modo non esiterà una valutazione entro
+il sistema di tali espressioni.
+L'unico caso significativo é il confronto tra espressioni aritmetiche.
+-/
 
 inductive tbval : bexp → pstate → bool → Prop
 | tbvalC {bv : bool} {s : pstate} :
@@ -98,7 +173,10 @@ inductive tbval : bexp → pstate → bool → Prop
 
 open tbval
 
--- TODO: definizione condivisa
+/-!
+### Sintassi per il linguaggio di programmazione IMP
+-/
+
 inductive com : Type
 | SKIP   : com
 | Assign : vname → aexp → com
@@ -114,6 +192,10 @@ notation `WHILE `:0 b ` DO `:68 c:68                := com.While b c
 abbreviation conf := com × pstate
 
 open com
+
+/-!
+### Semantica operazionale small-step di IMP
+-/
 
 inductive small_step : conf → conf → Prop
 | Assign  {s : pstate} {x : vname} {a : aexp} {v : val}:
@@ -156,6 +238,17 @@ infix `↝*`:70 := small_step_star
 
 end small_step
 
+/-!
+### Sistema di tipo per IMP
+L'obiettivo del sistema di tipo é di predirre staticamente quali valori verranno generati dalle espressioni
+ed evitare che espressioni malformate possano comparire durante la computazione.
+Il sistema di tipo qui presentato è molto rudimentale: presenta solamente due tipi (`Ity` e `Rty`) che corrispondono
+alle due tipologie di valori introdotte per le espressioni aritmetiche.
+Lo scopo del sistema di tipo é di tenere traccia dei tipi associati alle variabili e di permettere esclusivamente
+combinazioni compatibili internamente alle espressioni.
+Definiamo un contesto `tyenv` come una funzione che associa ad ogni variabile il proprio tipo.
+-/
+
 inductive ty : Type
 | Ity
 | Rty
@@ -163,6 +256,12 @@ inductive ty : Type
 open ty
 
 abbreviation tyenv := vname → ty
+
+/-!
+### Giudizi per espressioni aritmetiche
+Una espressione aritmetica `a` è ben tipata nel contesto `Γ` con tipo `τ`, simbolicamente `Γ ⊢ₐ a : τ` se é una
+costante, una variabile o la somma di due espressioni ben tipate dello stesso tipo.
+-/
 
 inductive atyping : tyenv → aexp → ty → Prop
 | atypeI {Γ : tyenv} {i : ℕ} :
@@ -182,6 +281,12 @@ inductive atyping : tyenv → aexp → ty → Prop
 notation Γ ` ⊢ₐ ` a ` : ` τ := atyping Γ a τ
 
 open atyping
+
+/-!
+### Giudizi per espressioni booleane
+Una espressione booleana `b` è ben tipata nel contesto `Γ`, simbolicamente `Γ ⊢₆ b` se é una costante, la negazione
+di una espressione ben tipata o il confronto tra due espressioni aritmetiche ben tipate dello stesso tipo.
+-/
 
 inductive btyping : tyenv → bexp → Prop
 | btypeC {Γ : tyenv} {bv : bool} :
@@ -204,6 +309,12 @@ inductive btyping : tyenv → bexp → Prop
 notation Γ ` ⊢₆ ` b := btyping Γ b
 
 open btyping
+
+/-!
+### Giudizi per comandi
+Un comando `c` è ben tipato nel contesto `Γ`, simbolicamente `Γ ⊢. c` se le sue componenti sono ben tipate e 
+se ogni ad ogni variabile é assegnato il valore di una espressione dello stesso tipo.
+-/
 
 inductive ctyping : tyenv → com → Prop
 | ctypeSKIP {Γ : tyenv} :
@@ -233,13 +344,23 @@ notation Γ ` ⊢. ` c := ctyping Γ c
 
 open ctyping
 
+/-
+La funzione `type` associa ad ogni valore il proprio tipo.
+-/
 def type : val → ty
 | (Iv i) := Ity
 | (Rv r) := Rty
 
--- TODO: definizione più strutturata?
+/-
+Uno stato `s` é ben tipato in un contesto `Γ`, simbolicamente `Γ ⊢ₛ s` se associa ad ogni variabile un valore
+del tipo corrispondente.
+-/
 notation Γ ` ⊢ₛ ` s := ∀ (y : vname), type (s y) = Γ y
 
+/--
+Lemma di preservazione per espressioni aritmetiche: se una espressione aritmetica é ben tipata, il suo tipo
+si mantiene durante la sua valutazione.
+-/
 lemma preservation_aexp {Γ : tyenv} {a : aexp} {τ : ty} {s : pstate} {v : val} : 
   (Γ ⊢ₐ a : τ) → taval a s v → (Γ ⊢ₛ s) → type v = τ :=
 begin
@@ -300,6 +421,10 @@ begin
     case Rv : r { exact ⟨r, rfl⟩ }
 end
 
+/--
+Lemma di progresso per espressioni aritmetiche: se una espressione é ben tipata, allora la sua valutazione termina
+senza errori.
+-/
 lemma progress_aexp {Γ : tyenv} {a : aexp} {τ : ty} {s : pstate} :
   (Γ ⊢ₐ a : τ) → (Γ ⊢ₛ s) → ∃ (v : val), taval a s v :=
 begin
@@ -355,6 +480,10 @@ begin
     },
 end
 
+/--
+Lemma di progresso per espressioni booleane: se una espressione booleana é ben tipata, la sua valutazione termina
+senza errori.
+-/
 lemma progress_bexp {Γ : tyenv} {b : bexp} {s : pstate} :
   (Γ ⊢₆ b) → (Γ ⊢ₛ s) → ∃ (v : bool), tbval b s v :=
 begin
@@ -424,6 +553,10 @@ begin
     }
 end
 
+/--
+Teorema di preservazione per comandi: se un comando `c` é ben tipato e si riduce in un passo ad un comando
+`c'`, allora anche `c'` é ben tipato. 
+-/
 theorem preservation_com {Γ : tyenv} {c c' : com} {s s' : pstate } :
   (Γ ⊢. c) → (c, s)↝(c', s') → (Γ ⊢. c') :=
 begin
@@ -462,6 +595,10 @@ begin
     }
 end
 
+/--
+Teorema di preservazione per gli stati: uno stato `s` ben tipato si mantiene tale anche dopo l'esecuzione di un
+comando `c`.
+-/
 theorem preservation_state {Γ : tyenv} {c c' : com} {s s' : pstate } :
   (Γ ⊢. c) → (Γ ⊢ₛ s) → (c, s)↝(c', s') → (Γ ⊢ₛ s') :=
 begin
@@ -519,6 +656,10 @@ begin
     }
 end
 
+/--
+Teorema di progresso per comandi: se un comando `c` diverso da `SKIP` ben tipato viene eseguito in un contesto `s` 
+ben tipato, allora il programma esegue per almeno un passo di calcolo.
+-/
 theorem progress_com {Γ : tyenv} {c : com} { s: pstate} :
   (Γ ⊢. c) → (Γ ⊢ₛ s) → ¬(c = SKIP) → ∃ (cs' : conf), (c, s)↝cs' :=
 begin
@@ -572,6 +713,12 @@ begin
     }
 end
 
+/--
+Teorema di correttezza del sistema di tipo: data l'esecuzione di un comando `c` ben tipato in uno stato `s` ben 
+tipato, o l'esecuzione é terminata, o é possibile compiere un ulteriore passo di calcolo (la computazione non
+si blocca).
+                                'Well typed programs cannot go wrong'.
+-/
 theorem type_soundness {Γ : tyenv} {c c' : com} {s s' : pstate} {cs'' : conf} :
   (c, s)↝*(c', s') → (Γ ⊢. c) → (Γ ⊢ₛ s) → ¬(c' = SKIP) → ∃ (cs'' : conf), (c', s')↝cs'':=
 begin
