@@ -65,12 +65,13 @@ begin
       trivial
     },
     case V : x {
-      dsimp[secₐ, aval] at *,
+      dsimp[secₐ] at *,
 
-      show s x = t x, from ‹s = t ⦅<= l⦆› x ‹sec x ≤ l›
+      show aval (V x) s = aval (V x) t, by
+        simp_rw[aval, ‹s = t ⦅<= l⦆› x ‹sec x ≤ l›]
     },
     case Plus : a₁ a₂ ih₁ ih₂ {
-      dsimp[secₐ, aval] at *,
+      dsimp[secₐ] at *,
 
       have : (secₐ a₁ <= l) ∧ (secₐ a₂ <= l), by 
         simpa using ‹max (secₐ a₁) (secₐ a₂) ≤ l›,
@@ -79,7 +80,53 @@ begin
       have : aval a₁ s = aval a₁ t, from ih₁ ‹s = t ⦅<= l⦆› ‹(secₐ a₁ <= l)›,
       have : aval a₂ s = aval a₂ t, from ih₂ ‹s = t ⦅<= l⦆› ‹(secₐ a₂ <= l)›,
 
-      show (aval a₁ s + aval a₂ s) = (aval a₁ t + aval a₂ t), by
-        rw[‹aval a₁ s = aval a₁ t›, ‹aval a₂ s = aval a₂ t›]
+      show aval (Plus a₁ a₂) s = aval (Plus a₁ a₂) t, by
+        simp_rw[aval, ‹aval a₁ s = aval a₁ t›, ‹aval a₂ s = aval a₂ t›]
+    }
+end
+
+lemma noninterference_bexp {s t : pstate} {l : lv} {b : bexp} :
+  s = t ⦅<= l⦆ → (sec₆ b <= l) → (bval b s = bval b t) :=
+begin
+  intros,
+  induction' b,
+    case Bc : {
+      trivial
+    },
+    case Not : {
+      dsimp[sec₆] at *,
+
+      have : bval b s = bval b t, from ih ‹s = t ⦅<= l⦆› ‹sec₆ b ≤ l›,
+
+      show bval (Not b) s = bval (Not b) t, by 
+        simp_rw[bval, ‹bval b s = bval b t›]
+    },
+    case And : b₁ b₂ ih₁ ih₂ {
+      dsimp[sec₆] at *,
+
+      have : (sec₆ b₁ <= l) ∧ (sec₆ b₂ <= l), by
+        simpa using ‹max (sec₆ b₁) (sec₆ b₂) <= l›,
+      cases' ‹(sec₆ b₁ <= l) ∧ (sec₆ b₂ <= l)›,
+
+      have : bval b₁ s = bval b₁ t, from ih₁ ‹s = t ⦅<= l⦆› ‹sec₆ b₁ ≤ l›,
+      have : bval b₂ s = bval b₂ t, from ih₂ ‹s = t ⦅<= l⦆› ‹sec₆ b₂ ≤ l›,
+
+      show bval (And b₁ b₂) s = bval (And b₁ b₂) t, by
+        simp_rw[bval, ‹bval b₁ s = bval b₁ t›, ‹bval b₂ s = bval b₂ t›]
+    },
+    case Less : a₁ a₂ {
+      dsimp[sec₆] at *,
+
+      have : (secₐ a₁ <= l) ∧ (secₐ a₂ <= l), by
+        simpa using ‹max (secₐ a₁) (secₐ a₂) <= l›,
+      cases' ‹(secₐ a₁ <= l) ∧ (secₐ a₂ <= l)›,
+
+      have : aval a₁ s = aval a₁ t, from 
+        noninterference_aexp ‹s = t ⦅<= l⦆› ‹(secₐ a₁ <= l)›,
+      have : aval a₂ s = aval a₂ t, from 
+        noninterference_aexp ‹s = t ⦅<= l⦆› ‹(secₐ a₂ <= l)›,
+
+      show bval (Less a₁ a₂) s = bval (Less a₁ a₂) t, by
+        simp_rw[bval, ‹aval a₁ s = aval a₁ t›, ‹aval a₂ s = aval a₂ t›]
     }
 end
