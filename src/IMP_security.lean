@@ -357,3 +357,47 @@ begin
       show t = t ⦅< l⦆, from refl
     }
 end
+
+theorem noninterference {c : com} {s s' t t' : pstate} {l : lv}:
+  (c, s) ⟹ s' → (c, t) ⟹ t' → (0 ⊢ₛ c) → s = t ⦅<= l⦆ → s' = t' ⦅<= l⦆ :=
+begin
+  intros _ _ _ _,
+  induction' ‹(c, s) ⟹ s'›,
+    case Skip : { 
+      cases' ‹(SKIP, t) ⟹ t'›,
+
+      show s' = t' ⦅<= l⦆, by assumption
+    },
+    case Assign : s _ _ { -- TODO: migliorabile?
+      cases' ‹(x ::= a, t) ⟹ t'› with _ t _,
+      cases' ‹0 ⊢ₛ x ::= a›,
+
+      have : (sec x <= l) ∨ (sec x > l), from le_or_lt (sec x) l,
+      cases' ‹(sec x <= l) ∨ (sec x > l)›,
+        case or.inl : {
+          intros,
+
+          have : (z = x) ∨ ¬(z = x), from em (z = x),
+          cases' ‹(z = x) ∨ ¬(z = x)›,
+            case or.inl : {
+              simp[‹z = x›, eq.refl x],
+
+              have : secₐ a <= l, from trans ‹secₐ a ≤ sec x› ‹sec x ≤ l›,
+              
+              show aval a s = aval a t, from 
+                noninterference_aexp ‹s = t ⦅<= l⦆› ‹secₐ a <= l›
+            },
+            case or.inr : {
+              simp[‹¬(z = x)›],
+
+              show s z = t z, from ‹s = t ⦅<= l⦆› z ‹sec z ≤ l› 
+            }
+        },
+        case or.inr : { sorry }
+    },
+    case Seq : { sorry },
+    case IfTrue : { sorry },
+    case IfFalse : { sorry },
+    case WhileTrue : { sorry },
+    case WhileFalse : { sorry } 
+end
