@@ -374,41 +374,68 @@ begin
       cases' ‹0 ⊢ₛ x ::= a›,
 
       have : (sec x <= l) ∨ (sec x > l), from le_or_lt (sec x) l,
-      cases' ‹(sec x <= l) ∨ (sec x > l)›,
-        case or.inl : { -- sec x <= l
-          have : (z = x) ∨ ¬(z = x), from em (z = x),
-          cases' ‹(z = x) ∨ ¬(z = x)›,
-            case or.inl : {
-              simp[‹z = x›],
+      have : (z = x) ∨ ¬(z = x), from em (z = x),
 
+      cases' ‹(z = x) ∨ ¬(z = x)›,
+        case inl : { 
+          simp[‹z = x›] at *,
+
+          cases' ‹(sec x <= l) ∨ (sec x > l)›,
+            case inl : {
               have : secₐ a <= l, from trans ‹secₐ a ≤ sec x› ‹sec x ≤ l›,
               
               show aval a s = aval a t, from 
                 noninterference_aexp ‹s = t ⦅<= l⦆› ‹secₐ a <= l›
             },
-            case or.inr : {
-              simp[‹¬(z = x)›],
-
-              show s z = t z, from ‹s = t ⦅<= l⦆› z ‹sec z ≤ l› 
-            }
-        },
-        case or.inr : { -- sec x > l
-          have : (z = x) ∨ ¬(z = x), from em (z = x),
-          cases' ‹(z = x) ∨ ¬(z = x)›,
-          case or.inl : {
-              rw[‹z = x›] at *,
+            case inr : {
               have : ¬(sec x <= l), from not_le_of_gt ‹sec x > l›,
               contradiction
-            },
-            case or.inr : {
-              simp[‹¬(z = x)›],
-
-              show s z = t z, from ‹s = t ⦅<= l⦆› z ‹sec z ≤ l› 
             }
+        },
+        case inr : {
+          simp[‹¬(z = x)›],
+
+          show s z = t z, from ‹s = t ⦅<= l⦆› z ‹sec z ≤ l› 
         }
     },
-    case Seq : { sorry },
-    case IfTrue : { sorry },
+    case Seq : _ _ s s₁ s' _ _ ih₁ ih₂ {
+      cases' ‹(c₁ ;; c₂, t) ⟹ t'› with _ _ _ _ _ _ t t₁,
+      cases' ‹0 ⊢ₛ c₁ ;; c₂›,
+
+      have : s₁ = t₁ ⦅<= l⦆, from ih₁ ‹(c₁, t) ⟹ t₁› ‹0 ⊢ₛ c₁› ‹s = t ⦅<= l⦆›,
+      
+      show s' = t' ⦅<= l⦆, from sorry 
+    },
+    case IfTrue : {
+      cases' ‹0 ⊢ₛ IF b THEN c₁ ELSE c₂›,
+      cases ‹(IF b THEN c₁ ELSE c₂, t) ⟹ t'›,
+        case IfTrue : {
+          have : sec₆ b ⊢ₛ c₁, from sorry,
+          have : sec₆ b ⊢ₛ c₂, from sorry,
+
+          have : (sec₆ b <= l) ∨ (sec₆ b > l), from le_or_lt (sec₆ b) l,
+          cases' ‹(sec₆ b <= l) ∨ (sec₆ b > l)›,
+            case inl : {
+              have : bval b s = bval b t, from 
+                noninterference_bexp ‹s = t ⦅<= l⦆› ‹sec₆ b ≤ l›,
+
+              have : 0 <= sec₆ b, from sorry,
+              have : 0 ⊢ₛ c₁, from anti_monotonicity ‹sec₆ b ⊢ₛ c₁› ‹0 <= sec₆ b›,
+
+              show s' = t' ⦅<= l⦆, from ih ‹(c₁, t) ⟹ t'› ‹0 ⊢ₛ c₁› ‹s = t ⦅<= l⦆›
+          },
+          case inr : { 
+            have : s = s' ⦅< sec₆ b⦆, from confinement ‹(c₁, s) ⟹ s'› ‹sec₆ b ⊢ₛ c₁›,
+            have : t = t' ⦅< sec₆ b⦆, from confinement ‹(c₁, t) ⟹ t'› ‹sec₆ b ⊢ₛ c₁›,
+
+            have : s = s' ⦅<= l⦆, from sorry,
+            have : t = t' ⦅<= l⦆, from sorry,
+
+            show s' = t' ⦅<= l⦆, from sorry
+          }
+        },
+        case IfFalse : { sorry }
+    },
     case IfFalse : { sorry },
     case WhileTrue : { sorry },
     case WhileFalse : { sorry } 
