@@ -1,5 +1,6 @@
 import tactic.induction
 import order.min_max
+import data.nat.basic
 
 abbreviation vname  := string
 abbreviation val    := ℕ
@@ -88,20 +89,53 @@ begin
   reflexivity
 end
 
-@[trans] lemma trans {s₁ s₂ s₃ : pstate} {l : lv} : 
-  s₁ = s₂ ⦅< l⦆ →  s₂ = s₃ ⦅< l⦆ → s₁ = s₃ ⦅< l⦆ :=
+lemma trans {s₁ s₂ s₃ : pstate} {l : lv} : 
+  s₁ = s₂ ⦅< l⦆ → s₂ = s₃ ⦅< l⦆ → s₁ = s₃ ⦅< l⦆ :=
 begin
   intros _ _ x _,
-
   have : s₁ x = s₂ x, from ‹s₁ = s₂ ⦅< l⦆› x ‹sec x < l›,
   have : s₂ x = s₃ x, from ‹s₂ = s₃ ⦅< l⦆› x ‹sec x < l›,
-
   show s₁ x = s₃ x, from trans ‹s₁ x = s₂ x› ‹s₂ x = s₃ x›
+end
+
+lemma restrict {s t : pstate} {l₁ l₂ : lv} :
+  s = t ⦅< l₁⦆ → (l₂ < l₁) → s = t ⦅<= l₂⦆ :=
+begin
+  intros _ _ x _,
+  have : sec x < l₁, from gt_of_gt_of_ge ‹l₂ < l₁› ‹sec x ≤ l₂›,
+  show s x = t x, from ‹s = t ⦅< l₁⦆› x ‹sec x < l₁› 
 end
 
 end state_eq_below_lv
 
+namespace state_eq_beloweq_lv
+
+lemma refl {s : pstate} {l : lv} : s = s ⦅<= l⦆ :=
+begin
+  intros,
+  reflexivity
+end
+
+lemma trans {s₁ s₂ s₃ : pstate} {l : lv} : 
+  s₁ = s₂ ⦅<= l⦆ →  s₂ = s₃ ⦅<= l⦆ → s₁ = s₃ ⦅<= l⦆ :=
+begin
+  intros _ _ x _,
+  have : s₁ x = s₂ x, from ‹s₁ = s₂ ⦅<= l⦆› x ‹sec x <= l›,
+  have : s₂ x = s₃ x, from ‹s₂ = s₃ ⦅<= l⦆› x ‹sec x <= l›,
+  show s₁ x = s₃ x, from trans ‹s₁ x = s₂ x› ‹s₂ x = s₃ x›
+end
+
+lemma symm {s t : pstate} {l : lv} :
+  s = t ⦅<= l⦆ → t = s ⦅<= l⦆ :=
+begin
+  intros _ x _, 
+  show t x = s x, from (‹s = t ⦅<= l⦆› x ‹sec x ≤ l›).symm
+end
+
+end state_eq_beloweq_lv
+
 open state_eq_below_lv
+open state_eq_beloweq_lv
 
 lemma noninterference_aexp {s t : pstate} {l : lv} {a : aexp} :
   s = t ⦅<= l⦆ → (secₐ a <= l) → (aval a s = aval a t) :=
@@ -245,12 +279,12 @@ inductive sec_type : lv → com → Prop
   sec_type l (c₁ ;; c₂)
 
 | If {b : bexp} {l : lv} {c₁ c₂ : com} :
-  sec_type (max (sec₆ b) l) c₁ →
-  sec_type (max (sec₆ b) l) c₂ →
+  sec_type (max l (sec₆ b)) c₁ →
+  sec_type (max l (sec₆ b)) c₂ →
   sec_type l (IF b THEN c₁ ELSE c₂)
 
 | While {b : bexp} {l : lv} {c : com} :
-  sec_type (max (sec₆ b) l) c →
+  sec_type (max l(sec₆ b)) c →
   sec_type l (WHILE b DO c)
 
 infix ` ⊢ₛ `:50 := sec_type
@@ -277,20 +311,20 @@ begin
       show l' ⊢ₛ c₁ ;; c₂, from Seq ‹l' ⊢ₛ c₁› ‹ l' ⊢ₛ c₂›
     },
     case If : _ _ c₁ c₂ _ _ ih₁ ih₂ {
-      have : max (sec₆ b) l' <= max (sec₆ b) l, from max_le_max (le_refl _) ‹l' ≤ l›,
+      have : max l' (sec₆ b) <= max l (sec₆ b), from max_le_max ‹l' ≤ l› (le_refl _) ,
       
-      have : max (sec₆ b) l' ⊢ₛ c₁, from ih₁ ‹max (sec₆ b) l' <= max (sec₆ b) l›,
-      have : max (sec₆ b) l' ⊢ₛ c₂, from ih₂ ‹max (sec₆ b) l' <= max (sec₆ b) l›,
+      have : max l' (sec₆ b) ⊢ₛ c₁, from ih₁ ‹max l' (sec₆ b) <= max l (sec₆ b)›,
+      have : max l' (sec₆ b) ⊢ₛ c₂, from ih₂ ‹max l' (sec₆ b) <= max l (sec₆ b)›,
 
       show l' ⊢ₛ IF b THEN c₁ ELSE c₂, from 
-        If ‹max (sec₆ b) l' ⊢ₛ c₁› ‹max (sec₆ b) l' ⊢ₛ c₂›
+        If ‹max l' (sec₆ b) ⊢ₛ c₁› ‹max l' (sec₆ b) ⊢ₛ c₂›
     },
     case While : {
-      have : max (sec₆ b) l' <= max (sec₆ b) l, from max_le_max (le_refl _) ‹l' ≤ l›,
+      have : max l' (sec₆ b) <= max l (sec₆ b), from max_le_max ‹l' ≤ l› (le_refl _),
 
-      have : max (sec₆ b) l' ⊢ₛ c, from ih ‹max (sec₆ b) l' <= max (sec₆ b) l›,
+      have : max l' (sec₆ b) ⊢ₛ c, from ih ‹max l' (sec₆ b) <= max l (sec₆ b)›,
 
-      show l' ⊢ₛ WHILE b DO c, from While ‹max (sec₆ b) l' ⊢ₛ c›
+      show l' ⊢ₛ WHILE b DO c, from While ‹max l' (sec₆ b) ⊢ₛ c›
     }
 end
 
@@ -329,27 +363,27 @@ begin
     case IfTrue : {
       cases' ‹l ⊢ₛ IF b THEN c₁ ELSE c₂›,
 
-      have : l <= max (sec₆ b) l, from le_max_right (sec₆ b) l,
-      have : l ⊢ₛ c₁, from anti_monotonicity ‹max (sec₆ b) l ⊢ₛ c₁› ‹l <= max (sec₆ b) l›,
+      have : l <= max l (sec₆ b), from le_max_left l (sec₆ b),
+      have : l ⊢ₛ c₁, from anti_monotonicity ‹max l (sec₆ b) ⊢ₛ c₁› ‹l <= max  l (sec₆ b)›,
 
       show s = t ⦅< l⦆, from ih ‹l ⊢ₛ c₁›
     },
     case IfFalse : {
       cases' ‹l ⊢ₛ IF b THEN c₁ ELSE c₂›,
 
-      have : l <= max (sec₆ b) l, from le_max_right (sec₆ b) l,
-      have : l ⊢ₛ c₂, from anti_monotonicity ‹max (sec₆ b) l ⊢ₛ c₂› ‹l <= max (sec₆ b) l›,
+      have : l <= max l (sec₆ b), from le_max_left l (sec₆ b),
+      have : l ⊢ₛ c₂, from anti_monotonicity ‹max l (sec₆ b) ⊢ₛ c₂› ‹l <= max l (sec₆ b)›,
 
       show s = t ⦅< l⦆, from ih ‹l ⊢ₛ c₂›
     },
     case WhileTrue : _ _ s s' t _ _ _ ih₁ ih₂ {
       cases' ‹l ⊢ₛ WHILE b DO c›,
 
-      have : l <= max (sec₆ b) l, from le_max_right (sec₆ b) l,
-      have : l ⊢ₛ c, from anti_monotonicity ‹max (sec₆ b) l ⊢ₛ c› ‹l <= max (sec₆ b) l›,
+      have : l <= max l (sec₆ b), from le_max_left l (sec₆ b),
+      have : l ⊢ₛ c, from anti_monotonicity ‹max l (sec₆ b) ⊢ₛ c› ‹l <= max l (sec₆ b)›,
 
       have : s = s' ⦅< l⦆, from ih₁ ‹l ⊢ₛ c›,
-      have : s' = t ⦅< l⦆, from ih₂ (While ‹max (sec₆ b) l ⊢ₛ c›),
+      have : s' = t ⦅< l⦆, from ih₂ (While ‹max l (sec₆ b) ⊢ₛ c›),
 
       show s = t ⦅< l⦆, from trans ‹s = s' ⦅< l⦆› ‹s'= t ⦅< l⦆›
     },
@@ -361,8 +395,10 @@ end
 theorem noninterference {c : com} {s s' t t' : pstate} {l : lv}:
   (c, s) ⟹ s' → (c, t) ⟹ t' → (0 ⊢ₛ c) → s = t ⦅<= l⦆ → s' = t' ⦅<= l⦆ :=
 begin
-  intros _ _ _ _,
+  intro,
+  revert t t',
   induction' ‹(c, s) ⟹ s'›,
+    all_goals { intros _ _ _ _ _ },
     case Skip : { 
       cases' ‹(SKIP, t) ⟹ t'›,
 
@@ -404,22 +440,24 @@ begin
 
       have : s₁ = t₁ ⦅<= l⦆, from ih₁ ‹(c₁, t) ⟹ t₁› ‹0 ⊢ₛ c₁› ‹s = t ⦅<= l⦆›,
       
-      show s' = t' ⦅<= l⦆, from sorry 
+      show s' = t' ⦅<= l⦆, from ih₂ ‹(c₂, t₁) ⟹ t'› ‹0 ⊢ₛ c₂› ‹s₁ = t₁ ⦅<= l⦆›
     },
     case IfTrue : {
       cases' ‹0 ⊢ₛ IF b THEN c₁ ELSE c₂›,
+
+      have : sec₆ b ⊢ₛ c₁, by simpa[nat.zero_max] using ‹max 0 (sec₆ b) ⊢ₛ c₁›,
+      have : sec₆ b ⊢ₛ c₂, by simpa[nat.zero_max] using ‹max 0 (sec₆ b) ⊢ₛ c₂›,
+
+      have : (sec₆ b <= l) ∨ (sec₆ b > l), from le_or_lt (sec₆ b) l,
+
       cases ‹(IF b THEN c₁ ELSE c₂, t) ⟹ t'›,
         case IfTrue : {
-          have : sec₆ b ⊢ₛ c₁, from sorry,
-          have : sec₆ b ⊢ₛ c₂, from sorry,
-
-          have : (sec₆ b <= l) ∨ (sec₆ b > l), from le_or_lt (sec₆ b) l,
           cases' ‹(sec₆ b <= l) ∨ (sec₆ b > l)›,
             case inl : {
               have : bval b s = bval b t, from 
                 noninterference_bexp ‹s = t ⦅<= l⦆› ‹sec₆ b ≤ l›,
 
-              have : 0 <= sec₆ b, from sorry,
+              have : 0 <= sec₆ b, from nat.zero_le (sec₆ b),
               have : 0 ⊢ₛ c₁, from anti_monotonicity ‹sec₆ b ⊢ₛ c₁› ‹0 <= sec₆ b›,
 
               show s' = t' ⦅<= l⦆, from ih ‹(c₁, t) ⟹ t'› ‹0 ⊢ₛ c₁› ‹s = t ⦅<= l⦆›
@@ -428,13 +466,30 @@ begin
             have : s = s' ⦅< sec₆ b⦆, from confinement ‹(c₁, s) ⟹ s'› ‹sec₆ b ⊢ₛ c₁›,
             have : t = t' ⦅< sec₆ b⦆, from confinement ‹(c₁, t) ⟹ t'› ‹sec₆ b ⊢ₛ c₁›,
 
-            have : s = s' ⦅<= l⦆, from sorry,
-            have : t = t' ⦅<= l⦆, from sorry,
+            have : s = s' ⦅<= l⦆, from restrict ‹s = s' ⦅< sec₆ b⦆› ‹sec₆ b > l›,
+            have : t = t' ⦅<= l⦆, from restrict ‹t = t' ⦅< sec₆ b⦆› ‹sec₆ b > l›,
 
-            show s' = t' ⦅<= l⦆, from sorry
+            show s' = t' ⦅<= l⦆, from 
+              trans (trans (symm ‹s = s' ⦅<= l⦆›) ‹s = t ⦅<= l⦆›) ‹t = t' ⦅<= l⦆›
           }
         },
-        case IfFalse : { sorry }
+        case IfFalse : {
+          cases' ‹(sec₆ b <= l) ∨ (sec₆ b > l)›,
+            case inr : {
+              have : s = s' ⦅< sec₆ b⦆, from confinement ‹(c₁, s) ⟹ s'› ‹sec₆ b ⊢ₛ c₁›,
+              have : t = t' ⦅< sec₆ b⦆, from confinement ‹(c₂, t) ⟹ t'› ‹sec₆ b ⊢ₛ c₂›,
+
+              have : s = s' ⦅<= l⦆, from restrict ‹s = s' ⦅< sec₆ b⦆› ‹sec₆ b > l›,
+              have : t = t' ⦅<= l⦆, from restrict ‹t = t' ⦅< sec₆ b⦆› ‹sec₆ b > l›,
+
+              show s' = t' ⦅<= l⦆, from
+                trans (trans (symm ‹s = s' ⦅<= l⦆›) ‹s = t ⦅<= l⦆›) ‹t = t' ⦅<= l⦆›
+            },
+            case inl : {
+              rw[noninterference_bexp ‹s = t ⦅<= l⦆› ‹sec₆ b ≤ l›] at *,
+              contradiction
+            },
+        }
     },
     case IfFalse : { sorry },
     case WhileTrue : { sorry },
