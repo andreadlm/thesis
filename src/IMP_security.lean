@@ -540,6 +540,26 @@ begin
               }
         }
     },
-    case WhileTrue : { sorry },
-    case WhileFalse : { sorry } 
+    case WhileTrue : {
+      cases' ‹0 ⊢ₛ WHILE b DO c›,
+
+      have : sec₆ b ⊢ₛ c, by simpa[nat.zero_max] using ‹max 0 (sec₆ b) ⊢ₛ c›,
+
+      have : (sec₆ b <= l) ∨ (sec₆ b > l), from le_or_lt (sec₆ b) l,
+      
+      cases' ‹(WHILE b DO c, t) ⟹ t'›,
+        case WhileTrue : { sorry },
+        case WhileFalse : { sorry }
+    },
+    case WhileFalse : _ _ s _ {
+      cases' ‹0 ⊢ₛ WHILE b DO c›,
+
+      have : sec₆ b ⊢ₛ c, by simpa[nat.zero_max] using ‹max 0 (sec₆ b) ⊢ₛ c›,
+      
+      cases' ‹(WHILE b DO c, t) ⟹ t'›,
+        case WhileTrue : _ _ t t₁ { sorry },
+        case WhileFalse : _ _ t _ {
+          show s = t ⦅<= l⦆, by assumption
+        }
+    } 
 end
