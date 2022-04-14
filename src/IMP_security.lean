@@ -569,7 +569,19 @@ begin
         },
         case WhileFalse : _ _ t _ {
           cases' ‹(sec₆ b <= l) ∨ (sec₆ b > l)›,
-            case inr : { sorry },
+            case inr : {
+              have : max (sec₆ b) (sec₆ b) ⊢ₛ c, by simpa[max_self] using ‹sec₆ b ⊢ₛ c›,
+              
+              have : s = s₁ ⦅< sec₆ b⦆, from confinement ‹(c, s) ⟹ s₁› ‹sec₆ b ⊢ₛ c›,
+              have : s₁ = s' ⦅< sec₆ b⦆, from 
+                confinement ‹(WHILE b DO c, s₁) ⟹ s'› (While ‹max (sec₆ b) (sec₆ b) ⊢ₛ c›),
+
+              have : s = s₁ ⦅<= l⦆, from restrict ‹s = s₁ ⦅< sec₆ b⦆› ‹sec₆ b > l›,
+              have : s₁ = s' ⦅<= l⦆, from restrict ‹s₁ = s' ⦅< sec₆ b⦆› ‹sec₆ b > l›,
+
+              show s' = t ⦅<= l⦆, from -- TODO: modo più compatto?
+                  symm (trans (symm ‹s = t ⦅<= l⦆›) (trans ‹s = s₁ ⦅<= l⦆› ‹s₁ = s' ⦅<= l⦆›))
+            },
             case inl : {
               rw[noninterference_bexp ‹s = t ⦅<= l⦆› ‹sec₆ b ≤ l›] at *,
               contradiction
