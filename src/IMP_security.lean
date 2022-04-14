@@ -369,18 +369,17 @@ begin
       show s' = t' ⦅<= l⦆, by assumption
     },
     case Assign : s _ _ { -- TODO: migliorabile?
+      intros,
       cases' ‹(x ::= a, t) ⟹ t'› with _ t _,
       cases' ‹0 ⊢ₛ x ::= a›,
 
       have : (sec x <= l) ∨ (sec x > l), from le_or_lt (sec x) l,
       cases' ‹(sec x <= l) ∨ (sec x > l)›,
-        case or.inl : {
-          intros,
-
+        case or.inl : { -- sec x <= l
           have : (z = x) ∨ ¬(z = x), from em (z = x),
           cases' ‹(z = x) ∨ ¬(z = x)›,
             case or.inl : {
-              simp[‹z = x›, eq.refl x],
+              simp[‹z = x›],
 
               have : secₐ a <= l, from trans ‹secₐ a ≤ sec x› ‹sec x ≤ l›,
               
@@ -393,7 +392,20 @@ begin
               show s z = t z, from ‹s = t ⦅<= l⦆› z ‹sec z ≤ l› 
             }
         },
-        case or.inr : { sorry }
+        case or.inr : { -- sec x > l
+          have : (z = x) ∨ ¬(z = x), from em (z = x),
+          cases' ‹(z = x) ∨ ¬(z = x)›,
+          case or.inl : {
+              rw[‹z = x›] at *,
+              have : ¬(sec x <= l), from not_le_of_gt ‹sec x > l›,
+              contradiction
+            },
+            case or.inr : {
+              simp[‹¬(z = x)›],
+
+              show s z = t z, from ‹s = t ⦅<= l⦆› z ‹sec z ≤ l› 
+            }
+        }
     },
     case Seq : { sorry },
     case IfTrue : { sorry },
