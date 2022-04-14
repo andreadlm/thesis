@@ -329,7 +329,7 @@ begin
 end
 
 lemma confinement {c : com} {s t : pstate} {l : lv} :
-  (c, s) ⟹ t → (l ⊢ₛ c) →  s = t ⦅< l⦆ :=
+  (c, s) ⟹ t → (l ⊢ₛ c) → s = t ⦅< l⦆ :=
 begin
   intros _ _,
   induction' ‹(c, s) ⟹ t›,
@@ -555,9 +555,30 @@ begin
       cases' ‹0 ⊢ₛ WHILE b DO c›,
 
       have : sec₆ b ⊢ₛ c, by simpa[nat.zero_max] using ‹max 0 (sec₆ b) ⊢ₛ c›,
+
+      have : (sec₆ b <= l) ∨ (sec₆ b > l), from le_or_lt (sec₆ b) l,
       
       cases' ‹(WHILE b DO c, t) ⟹ t'›,
-        case WhileTrue : _ _ t t₁ { sorry },
+        case WhileTrue : _ _ t t₁ {
+          cases' ‹(sec₆ b <= l) ∨ (sec₆ b > l)›,
+            case inr : {
+              have : max (sec₆ b) (sec₆ b) ⊢ₛ c, by simpa[max_self] using ‹sec₆ b ⊢ₛ c›,
+              
+              have : t = t₁ ⦅< sec₆ b⦆, from confinement ‹(c, t) ⟹ t₁› ‹sec₆ b ⊢ₛ c›,
+              have : t₁ = t' ⦅< sec₆ b⦆, from 
+                confinement ‹(WHILE b DO c, t₁) ⟹ t'› (While ‹max (sec₆ b) (sec₆ b) ⊢ₛ c›),
+              
+              have : t = t₁ ⦅<= l⦆, from restrict ‹t = t₁ ⦅< sec₆ b⦆› ‹sec₆ b > l›,
+              have : t₁ = t' ⦅<= l⦆, from restrict ‹t₁ = t' ⦅< sec₆ b⦆› ‹sec₆ b > l›,
+              
+              show s = t' ⦅<= l⦆, from
+                  trans (trans ‹s = t ⦅<= l⦆› ‹t = t₁ ⦅<= l⦆›) ‹t₁ = t' ⦅<= l⦆›
+            },
+            case inl : {
+              rw[noninterference_bexp ‹s = t ⦅<= l⦆› ‹sec₆ b ≤ l›] at *,
+              contradiction
+            }
+        },
         case WhileFalse : _ _ t _ {
           show s = t ⦅<= l⦆, by assumption
         }
