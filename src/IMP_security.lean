@@ -454,9 +454,6 @@ begin
         case IfTrue : {
           cases' ‹(sec₆ b <= l) ∨ (sec₆ b > l)›,
             case inl : {
-              have : bval b s = bval b t, from 
-                noninterference_bexp ‹s = t ⦅<= l⦆› ‹sec₆ b ≤ l›,
-
               have : 0 <= sec₆ b, from nat.zero_le (sec₆ b),
               have : 0 ⊢ₛ c₁, from anti_monotonicity ‹sec₆ b ⊢ₛ c₁› ‹0 <= sec₆ b›,
 
@@ -503,9 +500,6 @@ begin
         case IfFalse : {
           cases' ‹(sec₆ b <= l) ∨ (sec₆ b > l)›,
             case inl : {
-              have : bval b s = bval b t, from 
-                noninterference_bexp ‹s = t ⦅<= l⦆› ‹sec₆ b ≤ l›,
-
               have : 0 <= sec₆ b, from nat.zero_le (sec₆ b),
               have : 0 ⊢ₛ c₂, from anti_monotonicity ‹sec₆ b ⊢ₛ c₂› ‹0 <= sec₆ b›,
 
@@ -540,7 +534,7 @@ begin
               }
         }
     },
-    case WhileTrue : {
+    case WhileTrue : _ _ s s₁ s' _ _ _ ih₁ ih₂ {
       cases' ‹0 ⊢ₛ WHILE b DO c›,
 
       have : sec₆ b ⊢ₛ c, by simpa[nat.zero_max] using ‹max 0 (sec₆ b) ⊢ₛ c›,
@@ -548,8 +542,39 @@ begin
       have : (sec₆ b <= l) ∨ (sec₆ b > l), from le_or_lt (sec₆ b) l,
       
       cases' ‹(WHILE b DO c, t) ⟹ t'›,
-        case WhileTrue : { sorry },
-        case WhileFalse : { sorry }
+        case WhileTrue : _ _ t t₁ t' _ _ _ {
+          cases' ‹(sec₆ b <= l) ∨ (sec₆ b > l)›,
+            case inl : {
+              have : 0 <= sec₆ b, from nat.zero_le (sec₆ b),
+              have : 0 ⊢ₛ c, from anti_monotonicity ‹sec₆ b ⊢ₛ c› ‹0 <= sec₆ b›,
+
+              have : s₁ = t₁ ⦅<= l⦆, from ih₁ ‹(c, t) ⟹ t₁› ‹0 ⊢ₛ c› ‹s = t ⦅<= l⦆›,
+
+              show s' = t' ⦅<= l⦆, from
+                ih₂ ‹(WHILE b DO c, t₁) ⟹ t'› (While ‹max 0 (sec₆ b) ⊢ₛ c›) ‹s₁ = t₁ ⦅<= l⦆›
+            },
+            case inr : {
+              have : s = s₁ ⦅< sec₆ b⦆, from confinement ‹(c, s) ⟹ s₁› ‹sec₆ b ⊢ₛ c›,
+              have : t = t₁ ⦅< sec₆ b⦆, from confinement ‹(c, t) ⟹ t₁› ‹sec₆ b ⊢ₛ c›,
+
+              have : s = s₁ ⦅<= l⦆, from restrict ‹s = s₁ ⦅< sec₆ b⦆› ‹sec₆ b > l›,
+              have : t = t₁ ⦅<= l⦆, from restrict ‹t = t₁ ⦅< sec₆ b⦆› ‹sec₆ b > l›,
+
+              have : s₁ = t₁ ⦅<= l⦆, from
+                trans (trans (symm ‹s = s₁ ⦅<= l⦆›) ‹s = t ⦅<= l⦆›) ‹t = t₁ ⦅<= l⦆›,
+
+              show s' = t' ⦅<= l⦆, from 
+                ih₂ ‹(WHILE b DO c, t₁) ⟹ t'› (While ‹max 0 (sec₆ b) ⊢ₛ c›) ‹s₁ = t₁ ⦅<= l⦆›,
+            }
+        },
+        case WhileFalse : _ _ t _ {
+          cases' ‹(sec₆ b <= l) ∨ (sec₆ b > l)›,
+            case inr : { sorry },
+            case inl : {
+              rw[noninterference_bexp ‹s = t ⦅<= l⦆› ‹sec₆ b ≤ l›] at *,
+              contradiction
+            }
+        }
     },
     case WhileFalse : _ _ s _ {
       cases' ‹0 ⊢ₛ WHILE b DO c›,
@@ -563,7 +588,7 @@ begin
           cases' ‹(sec₆ b <= l) ∨ (sec₆ b > l)›,
             case inr : {
               have : max (sec₆ b) (sec₆ b) ⊢ₛ c, by simpa[max_self] using ‹sec₆ b ⊢ₛ c›,
-              
+
               have : t = t₁ ⦅< sec₆ b⦆, from confinement ‹(c, t) ⟹ t₁› ‹sec₆ b ⊢ₛ c›,
               have : t₁ = t' ⦅< sec₆ b⦆, from 
                 confinement ‹(WHILE b DO c, t₁) ⟹ t'› (While ‹max (sec₆ b) (sec₆ b) ⊢ₛ c›),
