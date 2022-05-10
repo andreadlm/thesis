@@ -1,0 +1,97 @@
+\documentclass[oneside, openany, 12pt, a4paper]{memoir}
+
+\usepackage[italian]{babel}
+\usepackage{fontspec}
+\usepackage{graphicx}
+\usepackage{mdframed}
+\usepackage{tabularx}
+\usepackage{enumitem}
+\usepackage[dvipsnames]{xcolor}
+\usepackage{verbatim}
+\usepackage[backend=biber, style=alphabetic, sorting=ynt]{biblatex}
+\addbibresource{bib.bib}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage[colorlinks]{hyperref}
+\usepackage{xurl}
+\usepackage{minted}
+\usepackage{csquotes}
+
+\setmonofont{FreeMono}
+\setmainfont{EB Garamond}
+
+\newenvironment{code}[1]
+{%
+  \VerbatimEnvironment
+  \begin{minted}{#1}%
+}
+{%
+  \end{minted}%
+}
+
+\hypersetup{
+  colorlinks,
+  citecolor=JungleGreen,
+  linkcolor=JungleGreen,
+  urlcolor=JungleGreen
+}
+
+\setminted{encoding=utf-8,
+           bgcolor=LightGray,
+           mathescape,
+           breaklines,
+           framesep=2mm
+           }
+\usemintedstyle{solarized-light}
+
+\definecolor{LightGray}{gray}{0.98}
+
+\chapterstyle{veelo}
+
+%---------------------------------------------------
+
+\title{Tesi di Andrea Delmastro}
+\author{Andrea Delmastro}
+\date{2022}
+
+\begin{document}
+
+\frontmatter
+
+\maketitle
+
+\newpage
+\input{chapters/abstract}
+
+\newpage 
+{
+  \hypersetup{linkcolor=black}
+  \tableofcontents
+}
+
+\mainmatter
+
+\part{Lean}
+
+\chapter{Introduzione}
+\input{chapters/chapter1}
+
+\chapter{Definizioni e tipi}
+\input{chapters/chapter2}
+
+\chapter{Propositions as Types}
+\input{chapters/chapter3}
+
+\chapter{Struttura delle prove e tattici}
+\input{chapters/chapter4}
+
+\appendix
+\chapter{Notazione}
+
+
+\backmatter
+\medskip
+\nocite{*}
+\printbibliography
+
+\end{document}

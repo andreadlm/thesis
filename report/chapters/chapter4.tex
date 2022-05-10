@@ -1,0 +1,125 @@
+Dato che la scrittura di prove completamente dettagliate è un lavoro tedioso e complicato (i kernel dei proof assistant si basano spesso su un numero ristretto di regole fidate), la strutturazione delle prove e l'automatizzazione delle procedure ricorrenti rappresentano un aiuto fondamentale fornito dal sistema nei confronti dell'utilizzatore. Lean in particolare si pone l'obiettivo di ridurre la distanza tra sistemi di verifica e sistemi di ricerca delle prove, introducendo procedure di costruzione di prove automatizzate.
+Il seguente capitolo introduce in modo schematico i costrutti sintattici e alcuni strumenti automatici che consentono di semplificare la scrittura delle prove in Lean 3.
+
+
+\section{Notazione} \label{not}
+Le seguenti notazioni rappresentano una sintassi alternativa per la definizione di proof-term:
+\begin{itemize}
+    \item il costrutto \mintinline{Lean}|assume (h : p), t | viene trattato come zucchero sintattico per \mintinline{Lean}|λ (h : p), t|. Il nome \mintinline{Lean}|h| può essere omesso, in tal caso il termine viene aggiunto al contesto col nome di default \mintinline{Lean}|this|. Allo stesso modo, non è necessario specificare il tipo \mintinline{Lean}|p| se è inferibile dal contesto.
+    \item il costrutto \mintinline{Lean}|have (h : p), from s, t| viene trattato come zucchero sintattico per \mintinline{Lean}|(λ (h : p), t) s|. \mintinline{Lean}|have| permette di introdurre dei passaggi intermedi nella dimostrazione. Il nome \mintinline{Lean}|h| può essere omesso, in tal caso il termine viene aggiunto al contesto col nome di default \mintinline{Lean}|this|.
+    \item il costrutto \mintinline{Lean}|show p, from t| viene trattato come zucchero sintattico per \mintinline{Lean}|(t : p)|. \mintinline{Lean}|show| permette di rimarcare il risultato desiderato, o in presenza di più goal, di selezionare il goal che si intende dimostrare in un dato passaggio.
+    \item la notazione \mintinline{Lean}|‹p›| corrisponde a \mintinline{Lean}|by assumption : p|. Permette di utilizzare un'ipotesi nel conteso locale di tipo \mintinline{Lean}|p|. Risulta particolarmente utile se si sono introdotti dei termini anonimi per snellire la struttura della prova. Il tattico \mintinline{Lean}|assumption| viene meglio descritto alla sezione \ref{tact}.
+    \item l'ambiente \mintinline{Lean}|calc| viene utilizzato per mostrare una serie di risultati intermedi che devono essere combinati per transitività. Può essere utilizzato con qualsiasi relazione binaria transitiva (per cui sia definito un lemma di transitività taggato come \mintinline{Lean}|[trans]|). Ogni passaggio intermedio è giustificato da una prova. Si veda la sezione \ref{conf} per un esempio.
+\end{itemize}
+Ad esempio, la prova !METTERE A POSTO\ref{disq}! può essere riscritta come segue:
+\begin{code}{Lean}
+example : (∀ x, p x ∧ q x) ↔ (∀ x, p x) ∧ (∀ x, q x) :=
+  iff.intro
+    (
+      assume hpq : ∀ x, p x ∧ q x,
+      show (∀ x, p x) ∧ (∀ x, q x), from
+        and.intro
+          (assume x : α,
+           show p x, from and.left (hpq x))
+          (assume x : α,
+           show q x, from and.right (hpq x))
+
+    )
+    (
+      assume hpq : (∀ x, p x) ∧ (∀ x, q x),
+      assume x : α,
+      have p x, from (and.left hpq) x,
+      have q x, from (and.right hpq) x,
+      show p x ∧ q x, from 
+        and.intro ‹p x› ‹q x›
+    )
+\end{code}
+
+\section{Tattici} \label{tact}
+I tattici semplificano e automatizzano la scrittura di dimostrazioni. Se un proof-term rappresenta una dimostrazione, un tattico è un'istruzione di alto livello che descrive al sistema come costruire un proof-term. Le prove così definite assumono una forma \emph{imperativa} anzichè \emph{funzionale}, favorendo uno stile di scrittura incrementale, dove una prova viene decomposta in più goal risolti uno alla volta, risultando spesso di più facile comprensione. Inoltre i tattici possono risolvere semplici dimostrazioni in totale autonomia, automatizzando i lavori spesso più tediosi in un processo di dimostrazione tramite proof-assistant. Lean costituisce il suo stesso metalinguaggio, per cui un tattico è un programma codificato in Lean stesso: ciò rende possibile codificare, importare e modificare tattici al pari dei teoremi.
+Ogni dove un'espressione sia richiesta, Lean accetta una sequenza di tattici compresa tra le due parole chiave \mintinline{Lean}|begin| e \mintinline{Lean}|end|. I tattici possono fare riferimento al goal corrente (\emph{ciò che rimane da dimostrare}), al contesto e all'insieme di parametri passati. L'applicazione di un tattico può produrre uno o più goal ausiliari.
+I tattici producono proof-term completamente dettagliati: data una definzione \mintinline{Lean}|d|, è possibile chiedere al sistema di mostrarne la struttura tramite il comando \mintinline{Lean}|#print d|.
+
+Una lista esaustiva dei tattici contenuti nella libreria base e una documentazione più accurata di quelli qui descritti può essere trovata al capitolo 5 di \cite{tpl} e al capitolo 6 di \cite{lrf}. Numerosi tattici sono introdotti dalla libreria matematica mathlib e documentati a \cite{matht}.
+
+\subsection{Tattici base}
+\begin{itemize}%[label={}, leftmargin=*]
+    \item \mintinline{Lean}|apply t|: applica un'espressione, unificando la conclusione con il goal corrente ed introducendo un nuovo goal per ogni ipotesi introdotta da \mintinline{Lean}|t|. Permette di procedete alla dimostrazione a ritroso, applicando .
+    \item \mintinline{Lean}|exact t|: chiude il goal corrente utilizzando esattamente il termine \mintinline{Lean}|t|. Permette di inserire parti di dimostrazioni \emph{term-style} in dimostrazioni \emph{tactic-style}.
+    \item \mintinline{Lean}|intro h|: introduce una nuova ipotesi \mintinline{Lean}|h| nel contesto. Può essere utilizzato anche senza specificare il nome \mintinline{Lean}|h|.
+    \item \mintinline{Lean}|assume (h : p)|: equivalente ad \mintinline{Lean}|assume| descritto nella sezione \ref{not}; versione alternativa di \mintinline{Lean}|intro|: che permette di specificare il tipo del termine introdotto.
+    \item \mintinline{Lean}|have (t : p) := expr|: equivalente ad \mintinline{Lean}|have| descritto alla sezione \ref{not}.
+    \item \mintinline{Lean}|show p|: ricerca il goal di tipo \mintinline{Lean}|p| e lo rende il goal principale.
+    \item \mintinline{Lean}|from t|: sinonimo di \mintinline{Lean}|exact t|, permette di utilizzare la combinazione \mintinline{Lean}|show p, from t| nel contesto di una dimostrazione \emph{tactic-style}.
+    \item \mintinline{Lean}|assumption|: ricerca nel contesto se esiste un termine il cui tipo corrisponda al tipo del goal corrente e se esiste lo applica, chiudendone la dimostrazione.
+    \item \mintinline{Lean}|contradiction|: ricera nel contesto se esitono due termini contraddittori e chiude la dimostrazione del goal corrente per contraddizione.
+    \item \mintinline{Lean}|trivial|: cerca di chiudere il goal corrente tramite una prova per riflessività o per contraddizione.
+    \item \mintinline{Lean}|reflexivity|, \mintinline{Lean}|transitivity| e \mintinline{Lean}|symmetry|: se il goal ha la forma \mintinline{Lean}|t ~ u| e \mintinline{Lean}|~| è una relazione riflessiva, il tattico \mintinline{Lean}|reflexivity| chiude il goal per riflessività, verificando che \mintinline{Lean}|t| e \mintinline{Lean}|u| siano definizionalmente equivalenti. Se il gaol ha la forma \mintinline{Lean}|t ~ u| e \mintinline{Lean}|~| è una relazione transitiva, il tattico \mintinline{Lean}|transitivity s| chiude il goal corrente e ne produce due nuovi, uno della forma \mintinline{Lean}|t ~ s| e l'altro della forma \mintinline{Lean}|s ~ u|. Se il  Se il gaol ha la forma \mintinline{Lean}|t ~ u| e \mintinline{Lean}|~| è una relazione simmetrica, il tattico \mintinline{Lean}|symmetry| sostituisce il goal corrente con \mintinline{Lean}|u ~ t|.
+\end{itemize}
+
+\subsection{Tattici per tipi induttivi}
+\begin{itemize}
+    \item \mintinline{Lean}|constructor|: il tattico si applica ad un goal il cui tipo sia induttivo e applica in sequenza tutti i costruttori del tipo finchè non ha successo, introducendo a quel punto un nuovo goal per ogni argomento del costruttore.
+    \item \mintinline{Lean}|cases x|: assumendo che \mintinline{Lean}|x| sia una variabile nel contesto locale con un tipo induttivo, produce un goal per ogni costruttore del tipo, introducendone gli argomenti come ipotesi nel contesto. Ogni elemento nel contesto che dipenda su \mintinline{Lean}|x| è specializzato di conseguenza. I goal associati ai singoli costruttori possono essere etichettati con la parola chiave \mintinline{Lean}|case|. La parola chiave \mintinline{Lean}|with| viene usata per specificare i nomi associati alle variabili introdotte nel contesto.
+    \item \mintinline{Lean}|induction x|: assumendo che \mintinline{Lean}|x| sia una variabile nel contesto locale con un tipo induttivo, applica il principio di induzione su \mintinline{Lean}|x| al goal principale, producendo un goal per ogni costruttore del tipo induttivo e introduce un' ipotesi induttiva per ogni argomento ricorsivo del costruttore. Ogni elemento nel contesto che dipende su \mintinline{Lean}|x| è specializzato di conseguenza. I goal associati ai singoli costruttori possono essere etichettati con la parola chiave \mintinline{Lean}|case|. La parola chiave \mintinline{Lean}|with| viene usata per specificare i nomi associati alle variabili introdotte nel contesto.
+\end{itemize}
+La parte \ref{semantica} del documento fa utilizzo di una versione leggermente modificata dei tattici \mintinline{Lean}|cases| e \mintinline{Lean}|induction|, rispettivamente \mintinline{Lean}|cases'| e \mintinline{Lean}|induction'|. Si tratta di versioni che meglio si prestano all'utilizzo predicati induttivi le cui differenze rispetto ai tattici standard sono documentate a \cite{matht}.
+
+\subsection{Riscrittura e semplificazione}
+Il tattico \mintinline{Lean}|rewrite| (\mintinline{Lean}|rw|) permette di riscrivere goal e ipotesi sulla base di una data equivalenza. La sintassi base è \mintinline{Lean}|rewrite e| dove \mintinline{Lean}|e| è un termine di tipo equivalenza nel contesto locale o un lemma generale. Più equivalenze possono essere applicate in sequenza con la sintassi \mintinline{Lean}|rewrite [e₁, e₂, ...]|. Di base le equivalenze vengono applicate da sinistra a destra del segno \mintinline{Lean}|=|, la notazione \mintinline{Lean}|←e| può essere utilizzata per indicare al tattico di applicare l'equivalenza nel senso opposto. Il tattico può essere applicato anche ad una o più ipotesi nel contesto locale, con la sintassi \mintinline{Lean}|rewrite e at h|.
+
+Il tattico \mintinline{Lean}|simp| offre una forma più avanzata di automazione per la riscrittura, cercando di riscrivere i sottotermini di una espressione utilizzando tutti i lemmi taggati con l'attributo \mintinline{Lean}|[simp]|. I lemmi così taggati possono essere applicati zero o più volte. La lista dei lemmi o delle ipotesi nel contesto locale da utilizzare può essere estesa con la sitassi \mintinline{Lean}|simp [e₁, e₂, ...]|. Analogamente a \mintinline{Lean}|rewrite|, il tattico può essere applicato ad una o più ipotesi nel contesto locale, con la sintassi \mintinline{Lean}|simp e at h|.
+
+\section{Confronto tra stili di dimostrazione} \label{conf}
+Viene qui dimostrata una semplice proprietà della somma: l'associatività. Nel primo caso la dimostrazione adotta uno stile funzionale puro, nel secondo caso è strutturata e fa utilizzo di tattici, nel terzo caso è condotta tradizionalmente senza l'utilizzo di Lean. I primi due stili sono mescolabili tra di loro: gli esempi ne enfatizzano le differenze mettendo in risalto le modalità attraverso cui il linguaggio cerca di essere espressivo e facilitare la scrittura delle dimostrazioni.
+
+\begin{code}{Lean}
+theorem add_assoc : ∀ (m n k : ℕ), m + n + k = m + (n + k) :=
+  λ (m n k : ℕ), nat.rec_on k 
+    (
+      congr_arg (λ h, m + h) (symm (nat.add_zero n))
+    )
+    (
+      λ (k' ih), trans (trans (trans (add_succ (m + n) k') (congr_arg succ ih)) (symm (add_succ m (n + k')))) (congr_arg (λ h, m + h) (symm (add_succ n k')))
+    )
+\end{code}
+
+\begin{code}{Lean}
+theorem add_assoc : ∀ (m n k : ℕ), (m + n) + k = m + (n + k) :=
+begin
+  intros,
+  induction k with k' ih,
+    case zero : {
+      show (m + n) + 0 = m + (n + 0), by 
+        rw [nat.add_zero, nat.add_zero]
+    },
+    case succ : {
+      show (m + n) + (succ k') = m + (n + (succ k')),
+        calc
+          m + n + (succ k') = succ (m + n + k') : 
+            by rw nat.add_succ
+          ...               = succ (m + (n + k')) : 
+            by rw ih
+          ...               = m + succ (n + k') : 
+            by rw nat.add_succ
+          ...               = m + (n + succ k') : 
+            by rw ←nat.add_succ
+    }
+end
+\end{code}
+\begin{mdframed}[backgroundcolor=LightGray,linewidth=0]
+\textbf{Teorema:} associatività della sommma
+$$ \forall\,m\,n\,k\,\in \mathbb{N}, (m\,+\,n)\,+\,k\,=\,m\,+(n\,+\,k) $$
+La dimostrazione procede per induzione su $k$. \\
+Nel caso $k = 0$ è necessario dimostrare
+$$(m\,+\,n)\,+\,0\,=\,m\,+(n\,+\,0)$$
+ma questo segue direttamente da $\forall\,n\,\in \mathbb{N}, (n\,+\,0) = n$. \\
+Nel caso $k = (succ\,k')$ è necessario dimostrare
+$$(m\,+\,n)\,+\,(succ\,k')\,=\,m\,+(n\,+\,(succ\,k'))$$
+da $\forall\,n\,m\,\in \mathbb{N}, n\,+\,(succ\,m) = succ(n\,+\,m)$ otteniamo
+$$(m\,+\,n)\,+\,(succ\,k')\,=succ\,(m\,+\,n\,+\,k')$$
+da cui, per ipotesi induttiva su $succ\,(m\,+\,n\,+\,k')$ otteniamo
+$$(m\,+\,n)\,+\,(succ\,k') = succ\,(m\,+\,(n\,+\,k'))$$
+per concludere, da $\forall\,n\,m\,\in \mathbb{N}, n\,+\,(succ\,m) = succ(n\,+\,m)$ abbiamo
+$$(m\,+\,n)\,+\,(succ\,k') = m\,+\,n\,+\,(succ\,k')$$
+\end{mdframed}

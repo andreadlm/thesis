@@ -1,0 +1,240 @@
+Il seguente capitolo presenta un'introduzione all'isomorfismo di Curry-Howard, un'idea cui spesso in letteratura ci si riferisce con l'espressione \emph{Propositions as types}. Tale isomorfismo mette in relazione logica ed informatica ed è l'idea fondamentale che permette ai moderni proof-assistant di essere espressivi rispetto ad un'ampia gamma di concetti logico-matematici. Viene inoltre mostrato come il sistema di tipi di Lean supporti questa corrispondenza e come definire oggetti matematici entro esso.
+
+\section{Deduzione naturale e isomorfismo di Curry-Howard} \label{natden}
+La deduzione naturale è un sistema deduttivo  introdotto da Gerhard Gentzen negli anni '30 per provare formalmente la correttezza di formule proposizionali. Il sistema si compone, per ogni connettivo logico, di una o più regole di introduzione e di una o più regole di eliminazione. Una prova è rappresentata da un albero di derivazione, con zero o più ipotesi ed una conclusione. Viene qui presentata una versione ristretta ai soli connettivi $\wedge$ e $\to$ così come presentata da \cite{Girard1989-GIRPAT}:
+\vspace{0.2cm}
+$$
+\begin{array}{ccc}
+\dfrac{\begin{array}{c} \vdots \\ P \end{array} \quad \begin{array}{c} \vdots \\ Q \end{array}}{P \,\wedge\, Q}\,(\wedge_I) \qquad
+\dfrac{\begin{array}{c} \vdots \\ P \,\wedge\, Q \end{array}}{P}\,(\wedge_{E_1}) \qquad
+\dfrac{\begin{array}{c} \vdots \\ P \,\wedge\, Q \end{array}}{Q}\,(\wedge_{E_2}) \qquad \\
+\dfrac{\begin{array}{c}[P] \\ \vdots \\ Q\end{array}}{P \,\Rightarrow\, Q}\,(\Rightarrow_{I}) \qquad
+\dfrac{\begin{array}{c} \vdots \\ P \,\Rightarrow\, Q \end{array} \quad \begin{array}{c} \vdots \\ P \end{array}}{Q}\,(\Rightarrow_E)
+\end{array}
+$$
+%\vspace{0.2cm}
+dove $P$ e $Q$ rappresentano proposizioni qualsiasi, ciò che sta al di sopra delle linee orizzontali compone le premesse e ciò che sta al di sotto la conclusione dell'inferenza. Ad esempio, la regola di introduzione per la conguinzione $(\wedge_I)$ afferma che se sia la proposizione $P$ che la proposizione $Q$ sono valide, allora anche la proposizione $P \,\wedge\, Q$ è valida. La regola di introduzione per l'implicazione $(\Rightarrow_I)$ afferma che se a partire dall'assuzione che $P$ valga si deriva $Q$, allora la proposizione $P \Rightarrow Q$ è valida e l'assunzione $P$ può essere scaricata.
+Una semplice derivazione entro il sistema mostra la correttezza della proposizione $(P \,\wedge\, Q) \Rightarrow (Q \,\wedge\, P)$:
+\vspace{0.2cm}
+$$
+\dfrac{\dfrac{\dfrac{[P \,\wedge\, Q]}{Q}\,(\wedge_{E_2})\quad\dfrac{[P \,\wedge\, Q]}{P}\,(\wedge_{E_1})}{Q \,\wedge\, P}\,(\wedge_I)}{(P \,\wedge\, Q) \Rightarrow (Q \,\wedge\, P)}(\Rightarrow_I)
+$$
+\vspace{0.2cm}
+
+Le regole di tipo per il $\lambda$-calcolo con tipi semplici descritto alla sezione \ref{tsemp} possono essere formalizzate come segue \cite{10.1145/2699407}:
+\vspace{0.2cm}
+$$
+\begin{array}{ccc}
+\dfrac{A \, : \, \alpha \quad B \, : \, \beta}{\langle A\, , \, B \rangle \, : \, \alpha \,\times\, \beta}\,(\times_I) \\ \\
+\dfrac{\langle A\, , \, B \rangle \, : \, \alpha \,\times\, \beta}{A \, : \, \alpha}\,(\times_{E_1}) \qquad
+\dfrac{\langle A\, , \, B \rangle \, : \, \alpha \,\times\, \beta}{B \, : \, \beta}\,(\times_{E_2}) \\ \\
+\dfrac{\begin{array}{c}[x \, : \, \alpha] \\ \vdots \\  B \, : \, \beta\end{array}}{(\lambda (x \, : \, \alpha). \, B) \, : \, \alpha \,\to\, \beta}\,(\to_I) \qquad
+\dfrac{F \, : \, \alpha \,\to\, \beta \quad A \, : \, \alpha}{F \, A \, : \, \beta}\,(\to_E)
+\end{array}
+$$
+\vspace{0.2cm}
+Un termine (\emph{programma}) di tipo $(A \,\times\, B) \to (B \,\times\,A)$ che scambi gli elementi di una coppia è così definito:
+\vspace{0.2cm}
+$$
+\dfrac{\dfrac{\dfrac{[c \,:\, \alpha \,\times\, \beta]}{c_{2} \,:\, \beta}\,(\times_{E_2})\quad\dfrac{[c \,:\, \alpha \,\times\, \beta]}{c_{1} \,:\, \alpha}\,(\times_{E_1})}{\langle c_{2} \, , \, c_{1}) \rangle, : \, \beta \,\times\, \alpha}\,(\times_I)}{(\lambda(c \,:\, \alpha \,\times\, \beta).\langle c_{2} \, , \, c_{1} \rangle) \, : \, (\alpha \,\times\, \beta) \to (\beta \,\times\, \alpha)}(\to_I)
+$$
+\vspace{0.2cm}
+
+Risulta chiaro come i due sistemi qui introdotti siano isomorfi: la regola di introduzione per la congiunzione corrisponde alla regola di introduzione per il tipo prodotto, la regola di introduzione per l'implicazione alla regola di introudzione per il tipo funzionale, ecc.
+Ad ogni proposizione può essere fatto corrispondere un tipo, ad esempio:
+\begin{gather*}
+    (P \wedge Q) \wedge R \implies P \wedge (Q \wedge R) \\
+    \text{corrisponde a} \\
+    (P \times Q) \times R \rightarrow P \times (Q \times R)
+\end{gather*}
+
+La corrispondenza tra $\lambda$-calcolo con tipi semplici e deduzione naturale venne evidenziata per la prima volta da W.A. Howard in \cite{Howard1980-HOWTFN-2}.
+L'isomorfismo mette in relazione logica ed informatica: fornire una prova circa la correttezza di una proposizione corrisponde alla costruzione di un termine dello stesso tipo. La corrispondenza fornisce un'interpretazione computazionale del processo di prova: una prova è essenzialmente un programma che, a partire dalle premesse, produce il risultato. L'idea è stata negli anni ampliata, definendo sistemi di tipi più complessi che permettano la definizione di una gamma più ampia di concetti logici. Uno di questi sistemi, il \emph{Calculus of constructions} ideato da Thierry Coquand \cite{coquand:inria-00076024} costituisce la base del sistema di tipi di Lean e di altri proof-assistant, tra cui Coq.
+
+\section{Proposizione e dimostrazioni in Lean}
+\subsection{Connettivi logici}
+Lean introduce un universo con caratteristiche particolari, \mintinline{Lean}|Prop|, che contiene tutti e soli i tipi delle proposizioni. La libreria standard definisce i connettori logici e le relative regole di introduzione ed eliminazione:
+\begin{itemize}
+    \item 
+        \textbf{Congiunzione}: date due proposizioni \mintinline{Lean}|p| e \mintinline{Lean}|q|, è possibile costrutire la proposizione \mintinline{Lean}|p and q|:
+        \begin{code}{Lean}
+constants p q : Prop
+#check and -- Prop → Prop → Prop
+#check and p q -- Prop
+
+-- Equivalentemente
+#check p ∧ q -- Prop
+        \end{code}
+        dove \mintinline{Lean}|and| è definito come un tipo induttivo con un solo costruttore (regola di introduzione per la congiunzione), per cui l'unico modo per costruire un termine di tipo $p\,\wedge\,q$ è tramite due termini di tipo $p$ e $q$:
+        \begin{code}{Lean}
+inductive and : Prop → Prop → Prop
+| intro : ∀ {p q : Prop}, p → q → and p q
+        \end{code}
+        Sono due le regole di eliminazione per \mintinline{Lean}|and|, equivalenti alle proiezioni per il tipo prodotto:
+        \begin{code}{Lean}
+#check and.left -- ∀ {p q : Prop}, p $\wedge$ q → p
+#check and.right -- ∀ {p q : Prop}, p $\wedge$ q → q
+        \end{code}
+    
+    \mintinline{Lean}|and| può essere considerata una specializzazione del tipo prodotto \mintinline{Lean}|prod| ($\times$) per le proposizioni.
+    
+    \item 
+        \textbf{Disgiunzione}: date due proposizioni \mintinline{Lean}|p| e \mintinline{Lean}|q|, è possibile costrutire la proposizione \mintinline{Lean}|p or q|:
+        \begin{code}{Lean}
+constants p q : Prop
+#check or -- Prop → Prop → Prop
+#check or p q -- Prop
+
+-- Equivalentemente
+#check p ∨ q -- Prop
+        \end{code}
+        dove \mintinline{Lean}|or| è definito come un tipo induttivo con due costruttori. Un termine di tipo $p \vee q$ può essere costruito, equivalentemente, tramite un termine di tipo $p$ o un termine di tipo $q$:
+        \begin{code}{Lean}
+inductive or : Prop → Prop → Prop
+| inl : ∀ {p q : Prop}, p → or p q
+| inr : ∀ {p q : Prop}, q → or p q
+        \end{code}
+        L'unica regola di eliminazione per \mintinline{Lean}|or| afferma che sia possibile provare una proposizione $r$ qualsiasi a partire da $p \vee q$, mostrando che sia $p$ che $q$ implicano $r$: 
+        \begin{code}{Lean}
+#check or.elim -- or.elim : ∀ {p q r : Prop}, p $\vee$ q → (p → r) → (q → r) → r
+        \end{code}
+        
+        \mintinline{Lean}|or| può essere considerata una specializzazione del tipo coprodotto \mintinline{Lean}|sum| ($\oplus$) per le proposizioni.
+    
+    \item
+        \textbf{Negazione}: la negazione \mintinline{Lean}|¬p| è definizionalmente equivalente a \mintinline{Lean}|p → false|. Il connettivo  \mintinline{Lean}|false| presenta una sola regola di eliminazione che afferma come dal falso consegua qualsiasi cosa (\emph{ex falso sequitur quodlibet}):
+        \begin{code}{Lean}
+#check false.elim -- Π {C : Type*}, false → C
+        \end{code}
+        Non sono definite regole di introduzione, l'unico modo per dimostare il falso è tramite una contraddizione:
+        \begin{code}{Lean}
+constant hp : p
+constant hnp : ¬p
+#check hnp hp -- false
+        \end{code}
+    \end{itemize}
+
+Provare una proposizione consiste nel fornire un abitante del tipo corrispondente o, equivalentemente, un \emph{testimone} della sua veridicità.
+Ad esempio, una prova della commutatività della congiunzione per due proposizioni \mintinline{Lean}|p| e \mintinline{Lean}|q| può essere definita come segue:
+\begin{code}{Lean}
+constants p q : Prop
+
+theorem and_comm : p ∧ q ↔ q ∧ p :=
+  iff.intro
+    (λ (h : p ∧ q), and.intro (and.right h) (and.left h))
+    (λ (h : q ∧ p), and.intro (and.right h) (and.left h))
+\end{code}
+dove la regola di introduzione per \mintinline{Lean}|iff| consiste nel fornire un termine per ogni direzione dell'implicazione.
+
+I tipi in \mintinline{Lean}|Prop| possono possedere un solo abitante (la prova della proposizione) se la proposizione è vera, o nessun abitante se la proposizione è falsa. In Lean due termini che abbiano lo stesso tipo \mintinline{Lean}|p : Prop| sono considerati equivalenti per definizione, un concetto noto come \emph{proof-irrelevance}.
+
+\subsection{Predicati}
+Sia $\alpha$ un tipo qualsiasi, un predicato $p$ su $\alpha$ può essere rappresentato come segue:
+\begin{code}{Lean}
+constant α : Type
+constant p : α → Prop
+\end{code}
+mentre, dato $x : \alpha$, $p\,x$ rappresenta il tipo del termine testimone della veridicità di $p\,x$ (o, analogamente, il tipo della prova per $p\,x$). 
+Analogamente una relazione $r$ su $\alpha$ e $\beta$ può essere rappresentata come segue:
+\begin{code}{Lean}
+constant α : Type
+constant β : Type
+constant r : α → β → Prop
+\end{code}
+dove \mintinline{Lean}|r| rappresenta una famiglia di tipi, e dati  \mintinline{Lean}|a : α| e \mintinline{Lean}|b : β|, \mintinline{Lean}|r a b| rappresenta il tipo delle $prove$ che \mintinline{Lean}|a| è in relazione con \mintinline{Lean}|b|.
+
+Naturalmente, ai tipi va fornita una definizione. Le famiglie induttive permettono la definizione di predicati induttivi. Gli indici costituiscono gli argomenti del predicato, ogni costruttore è una funzione dipendente che rappresenta una regola di derivazione, gli argomenti del costruttore le premesse e il termine restituito la conclusione.  (METTERE A POSTO)
+
+La stessa equivalenza viene definita come una famiglia induttiva con un solo costruttore:
+\begin{code}{Lean}
+inductive eq {α : Sort u} (a : α) : α → Prop
+| refl [] : eq a
+\end{code}
+
+\subsection{Quantificazione}
+Una proposizione $\forall\,(x : \alpha), p\,x$ è rappresentata mediante un tipo funzionale dipendente $\Pi\,(x : \alpha), p\;x$. Il simbolo \begin{mintinline}{Lean} ∀ \end{mintinline} viene trattato da Lean come un zucchero sintattico di \begin{mintinline}{Lean} Π \end{mintinline} per le proposizioni. La regola di introduzione per il quantificatore universale consiste nella definizione funzionale a partire da una prova di $p\,x$ assunto un $x : \alpha$ arbitrario, mentre la regola di eliminazione nell'applicazione funzionale: applicando la proposizione $th : \forall\,(x : \alpha), p\,x$ ad un $(y : \alpha)$ si ottiene un termine $(t : p\,y)$, ovvero un'istanza, o prova, della proposizione per $y$:
+\begin{code}{Lean}
+constant y : α
+constant th : ∀ (x : α), p x
+#check th y -- p y
+#check p y -- Prop
+\end{code}
+
+Analogamente, una proposizione $\exists\,(x : \alpha), p\,x$ è rappresentata mediante un tipo prodotto dipendente $\Sigma\,(x : \alpha), p\,x$. Nuovamente, il simbolo \begin{mintinline}{Lean} ∃ \end{mintinline} viene trattato da Lean come zucchero sintattico di \begin{mintinline}{Lean} Σ \end{mintinline} per le proposizioni. La regola di introduzione per il quantificatore esistenziale richiede di fornire un testimone $y$ e una prova $proof : p\;y$ della veridicità di $p$ per $y$:
+\begin{code}{Lean}
+constant y : α
+constant proof : p y
+#check exists.intro y proof -- ∃ (x : α), p x
+\end{code}
+La regola di eliminazione permette di provare una proposizione $q$ a partire da $th : \exists \;(x : \alpha), p\;x$, mostrando come $q$ segua da $p\;w$ per un $w$ arbitrario:
+\begin{code}{Lean}
+constant α : Type
+constant p : α → Prop
+constant th : ∃ (x : α), p x
+#check exists.elim th -- ∀ {α : Sort u} {p : α → Prop} {b : Prop}, (∃ (x : α), p x) → (∀ (a : α), p a → b) → b
+\end{code}
+
+Una prova della distributività della quantificazione universale rispetto alla congiunzione è codificabile nel seguente modo \label{disq}:
+\begin{code}{Lean}
+example : (∀ x, p x ∧ q x) ↔ (∀ x, p x) ∧ (∀ x, q x) :=
+  iff.intro
+    ( 
+      λ (hpq : (∀ x, p x ∧ q x)), 
+        and.intro
+          (λ (x : α), and.left (hpq x))
+          (λ (x : α), and.right (hpq x))
+    )
+    (
+      λ (hpq : (∀ x, p x) ∧ (∀ x, q x)) (x : α),
+        and.intro 
+          (hpq.left x) 
+          (hpq.right x)
+    )
+\end{code}
+
+\subsection{Induzione}
+Il principio di ricorsione su tipi inudttivi può essere sfruttato per svolgere delle dimostrazioni per induzione, dove l'ipotesi induttiva è rappresentata dalla chiamata ricorsiva. Ad esempio:
+\begin{code}{Lean}
+theorem zero_add : ∀ (n : ℕ), 0 + n = n :=
+  λ (n : ℕ), nat.rec_on n
+    (show 0 + 0 = 0, from eq.refl 0)
+    (λ (n : ℕ) (ih : 0 + n = n), 
+      show 0 + (succ n) = succ n, from 
+        calc
+          0 + (succ n) = succ (0 + n) : 
+            refl (0 + (succ n))
+          ...          = succ n : 
+            congr_arg succ ih)
+\end{code}
+equivalentemente, tramite pattern-matching:
+\begin{code}{Lean}
+theorem zero_add : ∀ (n : ℕ), 0 + n = n
+| 0        := show 0 + 0 = 0, from eq.refl 0
+| (succ n) := show 0 + (succ n) = succ n, from
+                calc
+                  0 + (succ n) = succ (0 + n) : 
+                    refl (0 + (succ n))
+                  ...          = succ n : 
+                    congr_arg succ (zero_add n)
+\end{code}
+quest'ultima versione mostra più chiaramente il legame tra chiamata ricorsiva e ipotesi induttiva.
+
+\renewcommand{\arraystretch}{1.2}
+\begin{ctabular}{|c|c|}
+  \hline
+  \textbf{Logica} & \textbf{Teoria dei tipi} \\
+  \hline
+  Implicazione & Tipo funzionale \\ 
+  Congiunzione & Tipo prodotto \\ 
+  Disgiunzione & Tipo coprodotto \\
+  Ipotesi & Variabile libera \\
+  Modus ponens & Applicazione di funzione \\
+  Indroduzione dell'implicazione & Astrazione \\
+  Proposizione & Tipo \\
+  Prova & Termine di un dato tipo \\
+  Quantificazione universale & Tipo funzione dipendente \\
+  Quantificazione esistenziale & Tipo prodotto dipendente \\
+  Induzione & Ricorsione \\
+  Ipotesi induttiva & Chiamata ricorsiva \\
+  \hline
+\end{ctabular}
