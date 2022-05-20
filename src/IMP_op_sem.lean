@@ -27,13 +27,15 @@ sono più 'naturali' rispetto alla medesima dimostrazione svolta su carta.
 * `s [ x  ↦  v ]` : aggiornamento dello stato `s`, con assegnazione di `v` a `x`
 * `::=` : comando di assegnamento
 * `;;` : concatenazione sequenziale di comandi
+* `IF THEN ELSE` : comando ramificazione condizionale
+* `WHILE DO` : comando di ciclo
 * `conf` : configurazione, coppia `com × pstate`
 * `⟹` : relazione big-step
 * `∼` : equivalenza di comandi
 * `↝` : riduzione small-step
 * `↝*` : chiusura riflessiva e transitiva di `↝`
 
-## Teoremi principali
+## Risultati principali
 
 * `big_step.deterministic : ∀ {c : com} {s t r : pstate}, (c, s) ⟹ t → (c, s) ⟹ r → t = r`
 * `small_step.deterministic : ∀ {c : com} {s : pstate} {cs₁ cs₂ : conf}, (c, s)↝cs₁ → (c, s)↝cs₂ → cs₁ = cs₂`
@@ -46,7 +48,25 @@ sono più 'naturali' rispetto alla medesima dimostrazione svolta su carta.
 
 abbreviation vname  := string
 abbreviation val    := ℕ
+
+/--
+Uno stato è una rappresentazione astratta della memora che  associa ad ogni variabile un valore.
+-/
 abbreviation pstate := vname → val
+
+/--
+Aggiornamento dello stato: associa ad una variabile un nuovo valore entro uno stato.
+-/
+def state_update (s : pstate) (x : vname) (v : val) : pstate :=
+  λ (y : vname), if (y = x) then v else s y
+
+/--
+Stato vuoto, associa ad ogni variabile il valore 0.
+-/
+def emp : pstate := (λ _, 0)
+
+notation s `[` x ` ↦ ` v `]`:100 := state_update s x v
+notation   `[` x ` ↦ ` v `]`     := emp [x ↦ v]
 
 /-!
 ### Espressioni aritmetiche
@@ -70,22 +90,9 @@ def aval : aexp → pstate → val
 | (V x)        s := s x
 | (Plus a₁ a₂) s := (aval a₁ s) + (aval a₂ s)
 
-/--
-Aggiornamento dello stato: associa ad una variabile entro uno stato un nuovo valore.
--/
-def state_update (s : pstate) (x : vname) (v : val) : pstate :=
-  λ (y : vname), if (y = x) then v else s y
-
-/--
-Stato vuoto, associa ad ogni variabile il valore 0.
--/
-def emp : pstate := (λ _, 0)
-
-notation s `[` x ` ↦ ` v `]`:100 := state_update s x v
-notation   `[` x ` ↦ ` v `]`     := emp [x ↦ v]
-
 /-!
 ### Espressioni booleane
+
 Sintassi e valutazione
 -/
 
