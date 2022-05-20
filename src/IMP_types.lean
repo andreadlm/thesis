@@ -1,27 +1,24 @@
 /-
 Authore: Andrea Delmastro
 -/
-
 import tactic.induction
 import data.real.basic
 
 /-!
 # Tipi semplici per IMP
 
-Questo file definisce un semplice sistema di tipi per il linguaggio di programmazione IMP e dimostra la
-correttezza utilizzando la semantica small-step. Viene in particolare dimostrata la proprietà di safety:
-se c è un comando ben tipato che viene eseguito in uno stato coerente con le dichiarazioni dei tipi delle 
-sue variabili allora l'esecuzione non si blocca prima di raggiungere un valore (se esiste).
-
-Il linguaggio di programmazione IMP viene esteso e ridefinito per comprendere due tipi di valori (interi 
-e reali).
+Questo file estende il linguaggio di programmazione IMP ad ammettere sia valori interi sia valori
+reali. Assunto che le due categorie di valori siano tra di loro incompatibili, la semantica viene
+modificata per supportare questa assunzione. Programmi sintatticamente corretti possono allora
+comporatare condizioni di errore. Il sistema di tipi garantisce l'assenza di errori a tempo di 
+esecuzione tramite una valutazione statica a tempo di compilazione.
 
 ## Note di implementazione
 
-Questo file utilizza per alcune dimostrazioni i tattici `cases'` e `induction'` definiti in `tactic.induction`. 
-Nonostante le medesime dimostrazioni siano ottenibili tramite i tattici `cases` e `induction` standard, le due 
-versioni qui utilizzate meglio si prestano all'utilizzo con predicati induttivi e sono più 'naturali' rispetto alla
-medesima dimostrazione svolta su carta.
+Questo file utilizza i tattici `cases'` e `induction'` definiti in `tactic.induction`. 
+Nonostante le medesime dimostrazioni siano ottenibili tramite i tattici `cases` e `induction` 
+classici, le due versioni qui utilizzate meglio si prestano all'utilizzo con predicati induttivi e 
+sono più 'naturali' rispetto alla medesima dimostrazione svolta su carta.
 
 ## Notazione
 
@@ -30,12 +27,25 @@ medesima dimostrazione svolta su carta.
 * `pstate` : stato di programma, funzione da `vname` a `val`
 * `s[x ↦ v]` : aggiornamento dello stato `s`, con assegnazione di `v` a `x`
 * `::=` : comando di assegnamento
-* `;;` : concatenazione sequenziale di comandi
+* `;;` : comando di concatenazione sequenziale tra comandi
+* `IF THEN ELSE` : comando ramificazione condizionale
+* `WHILE DO` : comando di ciclo
 * `conf` : configurazione, coppia `com × pstate`
 * `⟹` : relazione big-step
 * `∼` : equivalenza di comandi
 * `↝` : riduzione small-step
 * `↝*` : chiusura riflessiva e transitiva di `↝`
+* `⊢ₐ` : giudizio di tipo per espressioni aritmetiche
+* `⊢₆` : giudizio di tipo per espressioni booleane
+* `⊢.` : giudizio di tipo per comandi
+* `⊢₅` : compatibilità tra contesto e stato
+
+## Risultati principali
+
+* `progress_aexp {Γ : tyenv} {a : aexp} {τ : ty} {s : pstate} : (Γ ⊢ₐ a : τ) → (Γ ⊢₅ s) → ∃ (v : val), taval a s v`
+* `progress_bexp {Γ : tyenv} {b : bexp} {s : pstate} : (Γ ⊢₆ b) → (Γ ⊢₅ s) → ∃ (v : bool), tbval b s v`
+* `progress_com {Γ : tyenv} {c : com} { s: pstate} : (Γ ⊢. c) → (Γ ⊢₅ s) → ¬(c = SKIP) → ∃ (cs' : conf), (c, s)↝cs'`
+* `type_soundness {Γ : tyenv} {c c' : com} {s s' : pstate} {cs'' : conf} : (c, s)↝*(c', s') → (Γ ⊢. c) → (Γ ⊢₅ s) → ¬(c' = SKIP) → ∃ (cs'' : conf), (c', s')↝cs''`
 
 ## Riferimenti
 
@@ -50,18 +60,29 @@ inductive val : Type
 
 open val
 
+/--
+Uno stato è una rappresentazione astratta della memora che  associa ad ogni variabile un valore.
+-/
 abbreviation pstate := vname → val
 
+/--
+Aggiornamento dello stato: associa ad una variabile un nuovo valore entro uno stato.
+-/
 def state_update (s : pstate) (x : vname) (v : val) : pstate :=
   λ y, if (y = x) then v else s y
 
+/--
+Stato vuoto, associa ad ogni variabile il valore intero 0.
+-/
+def emp : pstate := (λ _, (Iv 0))
+
 notation s `[` x ` ↦ ` v `]`:100 := state_update s x v
-notation   `[` x ` ↦ ` v `]`     := (λ _, (Iv 0)) [x ↦ v]
+notation   `[` x ` ↦ ` v `]`     := emp [x ↦ v]
 
 /--
-Lemma tecnico utile all'utilizzo del tattico `simp` per l'applicazione degli stati
+Lemma tecnico utile all'utilizzo del tattico `simp` per l'applicazione degli stati.
 -/
-@[simp] def apply_state_update_pos {x y : vname} {s : pstate} {v : val} :
+@[simp] lemma apply_state_update_pos {x y : vname} {s : pstate} {v : val} :
   (y = x) → s[x ↦ v] y = v := 
 begin
   intro,
@@ -71,9 +92,9 @@ begin
 end
 
 /--
-Lemma tecnico utile all'utilizzo del tattico `simp` per l'applicazione degli stati
+Lemma tecnico utile all'utilizzo del tattico `simp` per l'applicazione degli stati.
 -/
-@[simp] def apply_state_update_neg {x y : vname} {s : pstate} {v : val} :
+@[simp] lemma apply_state_update_neg {x y : vname} {s : pstate} {v : val} :
   ¬(y = x) → s[x ↦ v] y = (s y) :=
 begin
   intro,
@@ -84,6 +105,7 @@ end
 
 /-!
 ### Espressioni aritmetiche
+
 Le espressioni aritmentiche prevedono due tipi di costanti: intere e reali.
 -/
 
@@ -97,11 +119,14 @@ open aexp
 
 /-!
 ### Valutazione di espressioni aritmetiche
-La valutazione delle espressioni aritmetiche è ora una funzione parziale: solo le espressioni ben formate
-(quelle in cui non vengono sommate tra di loro espressioni con tipo dei valori differenti) hanno senso.
-La valutazione viene quindi definita tramite predicati induttivi, dove una espressione viene messa in relazione
-al suo valore. I casi non ben formati non vengono definiti: in questo modo non esiterà una valutazione entro
-il sistema di tali espressioni.
+
+La valutazione delle espressioni aritmetiche è ora una funzione parziale: solo per le espressioni 
+ben formate (quelle che coinvolgono solo valori interi o solo valori reali) la valutazione termina
+producendo un valore.
+A questa formulazione viene preferita una definizione tramite un predicato induttivo, dove 
+un'espressione viene messa in relazione al suo valore entro lo stato di valutazione. I casi non ben 
+formati non vengono definiti: in questo modo non esiterà una valutazione entro il sistema di tali 
+espressioni.
 -/
 
 inductive taval : aexp → pstate → val → Prop
@@ -140,12 +165,8 @@ open bexp
 
 /-!
 ### Valutazione di espressioni booleane
-La valutazione delle espressioni booleane è ora una funzione parziale: solo le espressioni ben formate
-(quelle in cui non vengono confrontate tra di loro espressioni con tipo dei valori differenti) hanno senso.
-La valutazione viene quindi definita tramite predicati induttivi, dove una espressione viene messa in relazione
-al suo valore. I casi non ben formati non vengono definiti: in questo modo non esiterà una valutazione entro
-il sistema di tali espressioni.
-L'unico caso significativo é il confronto tra espressioni aritmetiche.
+
+Analogo alla valutazione per espressioni aritmetiche.
 -/
 
 inductive tbval : bexp → pstate → bool → Prop
@@ -195,6 +216,12 @@ open com
 
 /-!
 ### Semantica operazionale small-step di IMP
+
+La semantica dei comandi viene definita tramite una formulazione small-step, che meglio si presta 
+alla rappresentazione di computazioni che possono produrre errori. La semantica per questa versione 
+di IMP è molto simile a quella già definita, con la differenza che ogniqualvolta sia richiesta la 
+valutazione di un’espressione, questa deve essere derivabile entro i sistemi definiti 
+precedentemente.
 -/
 
 inductive small_step : conf → conf → Prop
@@ -240,12 +267,13 @@ end small_step
 
 /-!
 ### Sistema di tipo per IMP
-L'obiettivo del sistema di tipo é di predirre staticamente quali valori verranno generati dalle espressioni
-ed evitare che espressioni malformate possano comparire durante la computazione.
-Il sistema di tipo qui presentato è molto rudimentale: presenta solamente due tipi (`Ity` e `Rty`) che corrispondono
-alle due tipologie di valori introdotte per le espressioni aritmetiche.
-Lo scopo del sistema di tipo é di tenere traccia dei tipi associati alle variabili e di permettere esclusivamente
-combinazioni compatibili internamente alle espressioni.
+
+L'obiettivo del sistema di tipo é di predirre staticamente quali valori verranno generati dalle 
+espressioni ed evitare che espressioni malformate possano comparire durante la computazione.
+Il sistema di tipo qui presentato è molto rudimentale: presenta solamente due tipi (`Ity` e `Rty`) 
+che corrispondono alle due categorie di valori introdotte per le espressioni aritmetiche.
+Lo scopo del sistema di tipo é di tenere traccia dei tipi associati alle variabili e di permettere 
+esclusivamente combinazioni compatibili internamente alle espressioni.
 Definiamo un contesto `tyenv` come una funzione che associa ad ogni variabile il proprio tipo.
 -/
 
@@ -255,12 +283,17 @@ inductive ty : Type
 
 open ty
 
+/--
+Un contesto tiene traccia dei tipi associati a ciascuna variabile.
+-/
 abbreviation tyenv := vname → ty
 
 /-!
 ### Giudizi per espressioni aritmetiche
-Una espressione aritmetica `a` è ben tipata nel contesto `Γ` con tipo `τ`, simbolicamente `Γ ⊢ₐ a : τ` se é una
-costante, una variabile o la somma di due espressioni ben tipate dello stesso tipo.
+
+Una espressione aritmetica `a` è ben tipata nel contesto `Γ` con tipo `τ`, simbolicamente 
+`Γ ⊢ₐ a : τ` se é una costante, una variabile o la somma di due espressioni ben tipate a cui è
+associato lo stesso tipo.
 -/
 
 inductive atyping : tyenv → aexp → ty → Prop
@@ -284,8 +317,10 @@ open atyping
 
 /-!
 ### Giudizi per espressioni booleane
-Una espressione booleana `b` è ben tipata nel contesto `Γ`, simbolicamente `Γ ⊢₆ b` se é una costante, la negazione
-di una espressione ben tipata o il confronto tra due espressioni aritmetiche ben tipate dello stesso tipo.
+
+Una espressione booleana `b` è ben tipata nel contesto `Γ`, simbolicamente `Γ ⊢₆ b` se é una 
+costante, la negazione di una espressione ben tipata o il confronto tra due espressioni aritmetiche 
+ben tipate a cui è associato lo stesso tipo.
 -/
 
 inductive btyping : tyenv → bexp → Prop
@@ -312,8 +347,9 @@ open btyping
 
 /-!
 ### Giudizi per comandi
-Un comando `c` è ben tipato nel contesto `Γ`, simbolicamente `Γ ⊢. c` se le sue componenti sono ben tipate e 
-se ogni ad ogni variabile é assegnato il valore di una espressione dello stesso tipo.
+
+Un comando `c` è ben tipato nel contesto `Γ`, simbolicamente `Γ ⊢. c` se le sue componenti sono ben 
+tipate e se ogni assegnamento avviene tra variabili ed espressioni dello stesso tipo.
 -/
 
 inductive ctyping : tyenv → com → Prop
@@ -345,24 +381,25 @@ notation Γ ` ⊢. ` c := ctyping Γ c
 open ctyping
 
 /-
-La funzione `type` associa ad ogni valore il proprio tipo.
+La funzione `type` associa ad ogni valore il tipo cui è compatibile.
 -/
 def type : val → ty
 | (Iv i) := Ity
 | (Rv r) := Rty
 
 /-
-Uno stato `s` é ben tipato in un contesto `Γ`, simbolicamente `Γ ⊢ₛ s` se associa ad ogni variabile un valore
-del tipo corrispondente.
+Uno stato `s` é ben tipato in un contesto `Γ`, simbolicamente `Γ ⊢₅ s` se associa ad ogni variabile 
+un valore compatibile.
 -/
-notation Γ ` ⊢ₛ ` s := ∀ (y : vname), type (s y) = Γ y
+notation Γ ` ⊢₅ ` s := ∀ (y : vname), type (s y) = Γ y
 
 /--
-Lemma di preservazione per espressioni aritmetiche: se una espressione aritmetica é ben tipata, il suo tipo
-si mantiene durante la sua valutazione.
+Lemma di preservazione per espressioni aritmetiche: se una espressione aritmetica é ben tipata, la 
+sua valutazione in uno stato ben tipato produce un valore compatibile con il tipo associato
+all'espressione.
 -/
 lemma preservation_aexp {Γ : tyenv} {a : aexp} {τ : ty} {s : pstate} {v : val} : 
-  (Γ ⊢ₐ a : τ) → taval a s v → (Γ ⊢ₛ s) → type v = τ :=
+  (Γ ⊢ₐ a : τ) → taval a s v → (Γ ⊢₅ s) → type v = τ :=
 begin
   intros,
   induction' ‹(Γ ⊢ₐ a : τ)›,
@@ -376,13 +413,13 @@ begin
     },
     case atypeV : {
       cases ‹taval (V x) s v›,
-      apply ‹(Γ ⊢ₛ s)›
+      apply ‹(Γ ⊢₅ s)›
     },
     case atypeP : _ a₁ a₂ τ _ _ ih₁ ih₂ {
       cases ‹taval (Plus a₁ a₂) s v›,
         case tavalPI : _ _ _ i₁ i₂ _ _ { 
           have : τ = Ity, {
-            have : type (Iv i₁) = τ, from ih₁ ‹taval a₁ s (Iv i₁)› ‹(Γ ⊢ₛ s)›,
+            have : type (Iv i₁) = τ, from ih₁ ‹taval a₁ s (Iv i₁)› ‹(Γ ⊢₅ s)›,
             rw[type] at this,
             symmetry,
             assumption
@@ -392,7 +429,7 @@ begin
         },
         case tavalPR : _ _ _ r₁ r₂ _ _ {
           have : τ = Rty, {
-            have : type (Rv r₁) = τ, from ih₁ ‹taval a₁ s (Rv r₁)› ‹(Γ ⊢ₛ s)›,
+            have : type (Rv r₁) = τ, from ih₁ ‹taval a₁ s (Rv r₁)› ‹(Γ ⊢₅ s)›,
             rw[type] at this,
             symmetry,
             assumption
@@ -403,7 +440,13 @@ begin
     }
 end
 
-lemma extract_Ity {v : val} :
+namespace extract
+
+/-!
+Regole di inversione per `type`.
+-/
+
+lemma Ity {v : val} :
   (type v = Ity) → ∃ i, v = (Iv i) :=
 begin
   intro,
@@ -412,7 +455,7 @@ begin
     case Rv : { contradiction }
 end
 
-lemma extract_Rty {v : val} :
+lemma Rty {v : val} :
   (type v = Rty) → ∃ r, v = (Rv r) :=
 begin
   intro,
@@ -421,12 +464,14 @@ begin
     case Rv : r { exact ⟨r, rfl⟩ }
 end
 
+end extract
+
 /--
-Lemma di progresso per espressioni aritmetiche: se una espressione é ben tipata, allora la sua valutazione termina
-senza errori.
+Lemma di progresso per espressioni aritmetiche: se una espressione é ben tipata, allora la sua 
+valutazione termina senza errori.
 -/
 lemma progress_aexp {Γ : tyenv} {a : aexp} {τ : ty} {s : pstate} :
-  (Γ ⊢ₐ a : τ) → (Γ ⊢ₛ s) → ∃ (v : val), taval a s v :=
+  (Γ ⊢ₐ a : τ) → (Γ ⊢₅ s) → ∃ (v : val), taval a s v :=
 begin
   intros,
   induction' ‹(Γ ⊢ₐ a : τ)›,
@@ -440,25 +485,25 @@ begin
       show ∃ v, taval (V x) s v, from ⟨ (s x), tavalV ⟩ 
     },
     case atypeP : _ a₁ a₂ τ _ _ ih₁ ih₂ {
-      have : ∃ v, taval a₁ s v, from ih₁ ‹(Γ ⊢ₛ s)›,
+      have : ∃ v, taval a₁ s v, from ih₁ ‹(Γ ⊢₅ s)›,
       cases ‹∃ v, taval a₁ s v› with v₁,
 
-      have : ∃ v, taval a₂ s v, from ih₂ ‹(Γ ⊢ₛ s)›,
+      have : ∃ v, taval a₂ s v, from ih₂ ‹(Γ ⊢₅ s)›,
       cases ‹∃ v, taval a₂ s v› with v₂,
 
       have : type v₁ = τ, from 
-        preservation_aexp ‹(Γ ⊢ₐ a₁ : τ)› ‹taval a₁ s v₁› ‹(Γ ⊢ₛ s)›,
+        preservation_aexp ‹(Γ ⊢ₐ a₁ : τ)› ‹taval a₁ s v₁› ‹(Γ ⊢₅ s)›,
 
       have : type v₂ = τ, from
-        preservation_aexp ‹(Γ ⊢ₐ a₂ : τ)› ‹taval a₂ s v₂› ‹(Γ ⊢ₛ s)›,
+        preservation_aexp ‹(Γ ⊢ₐ a₂ : τ)› ‹taval a₂ s v₂› ‹(Γ ⊢₅ s)›,
 
       cases τ,
         case Ity : {
-          have : ∃ i₁, v₁ = (Iv i₁), from extract_Ity ‹type v₁ = Ity›,
+          have : ∃ i₁, v₁ = (Iv i₁), from extract.Ity ‹type v₁ = Ity›,
           cases ‹∃ i₁, v₁ = (Iv i₁)› with i₁,
           rw[‹v₁ = Iv i₁›] at *,
 
-          have : ∃ i₂, v₂ = (Iv i₂), from extract_Ity ‹type v₂ = Ity›,
+          have : ∃ i₂, v₂ = (Iv i₂), from extract.Ity ‹type v₂ = Ity›,
           cases ‹∃ i₂, v₂ = (Iv i₂)› with i₂,
           rw[‹v₂ = Iv i₂›] at *,
 
@@ -466,11 +511,11 @@ begin
             ⟨ (Iv (i₁ + i₂)), tavalPI ‹taval a₁ s (Iv i₁)› ‹taval a₂ s (Iv i₂)› ⟩
         },
         case Rty : {
-          have : ∃ r₁, v₁ = (Rv r₁), from extract_Rty ‹type v₁ = Rty›,
+          have : ∃ r₁, v₁ = (Rv r₁), from extract.Rty ‹type v₁ = Rty›,
           cases ‹∃ r₁, v₁ = (Rv r₁)› with r₁,
           rw[‹v₁ = Rv r₁›] at *,
 
-          have : ∃ r₂, v₂ = (Rv r₂), from extract_Rty ‹type v₂ = Rty›,
+          have : ∃ r₂, v₂ = (Rv r₂), from extract.Rty ‹type v₂ = Rty›,
           cases ‹∃ r₂, v₂ = (Rv r₂)› with r₂,
           rw[‹v₂ = Rv r₂›] at *,
 
@@ -481,11 +526,11 @@ begin
 end
 
 /--
-Lemma di progresso per espressioni booleane: se una espressione booleana é ben tipata, la sua valutazione termina
-senza errori.
+Lemma di progresso per espressioni booleane: se una espressione booleana é ben tipata, la sua 
+valutazione termina senza errori.
 -/
 lemma progress_bexp {Γ : tyenv} {b : bexp} {s : pstate} :
-  (Γ ⊢₆ b) → (Γ ⊢ₛ s) → ∃ (v : bool), tbval b s v :=
+  (Γ ⊢₆ b) → (Γ ⊢₅ s) → ∃ (v : bool), tbval b s v :=
 begin
   intros,
   induction' ‹(Γ ⊢₆ b)›,
@@ -494,17 +539,17 @@ begin
         ⟨ bv, tbvalC ⟩
     },
     case btypeN : {
-      have : ∃ v, tbval b s v, from ih ‹(Γ ⊢ₛ s)›,
+      have : ∃ v, tbval b s v, from ih ‹(Γ ⊢₅ s)›,
       cases ‹∃ v, tbval b s v› with bv,
 
       show ∃ v, tbval (Not b) s v, from
         ⟨ ¬bv, tbvalN ‹tbval b s bv› ⟩
     },
     case btypeA : _ b₁ b₂ _ _ ih₁ ih₂ { 
-      have : ∃ v, tbval b₁ s v, from ih₁ ‹(Γ ⊢ₛ s)›,
+      have : ∃ v, tbval b₁ s v, from ih₁ ‹(Γ ⊢₅ s)›,
       cases ‹∃ v, tbval b₁ s v› with bv₁,
 
-      have : ∃ v, tbval b₂ s v, from ih₂ ‹(Γ ⊢ₛ s)›,
+      have : ∃ v, tbval b₂ s v, from ih₂ ‹(Γ ⊢₅ s)›,
       cases ‹∃ v, tbval b₂ s v› with bv₂,
 
       show ∃ v, tbval (And b₁ b₂) s v, from
@@ -512,26 +557,26 @@ begin
     },
     case btypeL : _ _ _ τ _ _ { 
       have : ∃ v, taval a₁ s v, from 
-        progress_aexp ‹(Γ ⊢ₐ a₁ : τ)› ‹(Γ ⊢ₛ s)›,
+        progress_aexp ‹(Γ ⊢ₐ a₁ : τ)› ‹(Γ ⊢₅ s)›,
       cases ‹∃ v, taval a₁ s v› with v₁,
 
       have : ∃ v, taval a₂ s v, from 
-        progress_aexp ‹(Γ ⊢ₐ a₂ : τ)› ‹(Γ ⊢ₛ s)›,
+        progress_aexp ‹(Γ ⊢ₐ a₂ : τ)› ‹(Γ ⊢₅ s)›,
       cases ‹∃ v, taval a₂ s v› with v₂,
 
       have : type v₁ = τ, from 
-        preservation_aexp ‹(Γ ⊢ₐ a₁ : τ)› ‹taval a₁ s v₁› ‹(Γ ⊢ₛ s)›,
+        preservation_aexp ‹(Γ ⊢ₐ a₁ : τ)› ‹taval a₁ s v₁› ‹(Γ ⊢₅ s)›,
 
       have : type v₂ = τ, from
-        preservation_aexp ‹(Γ ⊢ₐ a₂ : τ)› ‹taval a₂ s v₂› ‹(Γ ⊢ₛ s)›,
+        preservation_aexp ‹(Γ ⊢ₐ a₂ : τ)› ‹taval a₂ s v₂› ‹(Γ ⊢₅ s)›,
 
       cases τ,
         case Ity : {
-          have : ∃ i, v₁ = (Iv i), from extract_Ity ‹type v₁ = Ity›,
+          have : ∃ i, v₁ = (Iv i), from extract.Ity ‹type v₁ = Ity›,
           cases ‹∃ i, v₁ = (Iv i)› with i₁,
           rw[‹v₁ = Iv i₁›] at *,
 
-          have : ∃ i, v₂ = (Iv i), from extract_Ity ‹type v₂ = Ity›,
+          have : ∃ i, v₂ = (Iv i), from extract.Ity ‹type v₂ = Ity›,
           cases ‹∃ i, v₂ = (Iv i)› with i₂,
           rw[‹v₂ = Iv i₂›] at *,
 
@@ -539,11 +584,11 @@ begin
             ⟨ (i₁ < i₂), tbvalLI ‹taval a₁ s (Iv i₁)› ‹taval a₂ s (Iv i₂)› ⟩
         },
         case Rty : {
-          have : ∃ r, v₁ = (Rv r), from extract_Rty ‹type v₁ = Rty›,
+          have : ∃ r, v₁ = (Rv r), from extract.Rty ‹type v₁ = Rty›,
           cases ‹∃ r, v₁ = (Rv r)› with r₁,
           rw[‹v₁ = Rv r₁›] at *,
 
-          have : ∃ r, v₂ = (Rv r), from extract_Rty ‹type v₂ = Rty›,
+          have : ∃ r, v₂ = (Rv r), from extract.Rty ‹type v₂ = Rty›,
           cases ‹∃ r, v₂ = (Rv r)› with r₂,
           rw[‹v₂ = Rv r₂›] at *,
 
@@ -554,10 +599,10 @@ begin
 end
 
 /--
-Teorema di preservazione per comandi: se un comando `c` é ben tipato e si riduce in un passo ad un comando
-`c'`, allora anche `c'` é ben tipato. 
+Teorema di preservazione per comandi: se un comando `c` é ben tipato e si riduce in un passo ad un 
+comando `c'`, allora anche `c'` é ben tipato. 
 -/
-theorem preservation_com {Γ : tyenv} {c c' : com} {s s' : pstate } :
+lemma preservation_com {Γ : tyenv} {c c' : com} {s s' : pstate } :
   (Γ ⊢. c) → (c, s)↝(c', s') → (Γ ⊢. c') :=
 begin
   intros,
@@ -596,11 +641,11 @@ begin
 end
 
 /--
-Teorema di preservazione per gli stati: uno stato `s` ben tipato si mantiene tale anche dopo l'esecuzione di un
-comando `c`.
+Teorema di preservazione per gli stati: uno stato `s` ben tipato si mantiene tale anche dopo 
+l'esecuzione di un comando `c`.
 -/
-theorem preservation_state {Γ : tyenv} {c c' : com} {s s' : pstate } :
-  (Γ ⊢. c) → (Γ ⊢ₛ s) → (c, s)↝(c', s') → (Γ ⊢ₛ s') :=
+lemma preservation_state {Γ : tyenv} {c c' : com} {s s' : pstate } :
+  (Γ ⊢. c) → (Γ ⊢₅ s) → (c, s)↝(c', s') → (Γ ⊢₅ s') :=
 begin
   intro, intro, intro,
   induction' ‹(Γ ⊢. c)›,
@@ -611,7 +656,7 @@ begin
       cases' ‹(x ::= a, s)↝(c', s')› with _ x _ _ _,
 
       have : type v = Γ x, from
-        preservation_aexp ‹(Γ ⊢ₐ a : Γ x)› ‹taval a s v› ‹(Γ ⊢ₛ s)›,
+        preservation_aexp ‹(Γ ⊢ₐ a : Γ x)› ‹taval a s v› ‹(Γ ⊢₅ s)›,
 
       assume y : vname,
       have : (y = x) ∨ ¬(y = x), from em (y = x),
@@ -627,41 +672,41 @@ begin
           have : (s[x ↦ v] y) = s y, by simp[‹¬y = x›],
           rw[‹s[x ↦ v] y = s y›],
 
-          show type (s y) = Γ y, from ‹(Γ ⊢ₛ s)› y
+          show type (s y) = Γ y, from ‹(Γ ⊢₅ s)› y
         }
 
     },
     case ctypeSeq : _ c₁ c₂ _ _ ih₁ ih₂ {
       cases' ‹(c₁ ;; c₂, s)↝(c', s')›,
         case Seq1 : {
-          show (Γ ⊢ₛ s), by assumption
+          show (Γ ⊢₅ s), by assumption
         },
         case Seq2 : {
-          show (Γ ⊢ₛ s'), from ih₁ ‹(Γ ⊢ₛ s)› ‹(c₁, s)↝(c₁', s')›,
+          show (Γ ⊢₅ s'), from ih₁ ‹(Γ ⊢₅ s)› ‹(c₁, s)↝(c₁', s')›,
         }
     },
     case ctypeIf : _ _ c₁ c₂ _ _ _ ih₁ ih₂ { 
       cases' ‹(IF b THEN c₁ ELSE c₂, s)↝(c', s')›,
         case IfTrue : {
-          show (Γ ⊢ₛ s), by assumption
+          show (Γ ⊢₅ s), by assumption
         },
         case IfFalse : {
-          show (Γ ⊢ₛ s), by assumption
+          show (Γ ⊢₅ s), by assumption
         }
     },
     case ctypeWhile : {
       cases' ‹(WHILE b DO c, s)↝(c', s')›,
 
-      show (Γ ⊢ₛ s), by assumption 
+      show (Γ ⊢₅ s), by assumption 
     }
 end
 
 /--
-Teorema di progresso per comandi: se un comando `c` diverso da `SKIP` ben tipato viene eseguito in un contesto `s` 
-ben tipato, allora il programma esegue per almeno un passo di calcolo.
+Teorema di progresso per comandi: se un comando `c` diverso da `SKIP` ben tipato viene eseguito in 
+un contesto `s` ben tipato, allora il programma esegue per almeno un passo di calcolo.
 -/
-theorem progress_com {Γ : tyenv} {c : com} { s: pstate} :
-  (Γ ⊢. c) → (Γ ⊢ₛ s) → ¬(c = SKIP) → ∃ (cs' : conf), (c, s)↝cs' :=
+lemma progress_com {Γ : tyenv} {c : com} { s: pstate} :
+  (Γ ⊢. c) → (Γ ⊢₅ s) → ¬(c = SKIP) → ∃ (cs' : conf), (c, s)↝cs' :=
 begin
   intros,
   induction' ‹(Γ ⊢. c)›,
@@ -669,7 +714,7 @@ begin
       contradiction 
     },
     case ctypeAssign : {
-      have : ∃ v, taval a s v, from progress_aexp ‹(Γ ⊢ₐ a : Γ x)› ‹(Γ ⊢ₛ s)›,
+      have : ∃ v, taval a s v, from progress_aexp ‹(Γ ⊢ₐ a : Γ x)› ‹(Γ ⊢₅ s)›,
       cases' ‹∃ v, taval a s v› with v,
 
       show ∃ cs', (x ::= a, s)↝cs', from
@@ -685,7 +730,7 @@ begin
           show ∃ cs', (SKIP ;; c₂, s)↝cs', from ⟨ (c₂, s), Seq1 ⟩
         },
         case or.inr : { -- ¬(c₁ = SKIP) 
-          have : ∃ cs', (c₁, s)↝cs', from ih₁ ‹(Γ ⊢ₛ s)› ‹¬(c₁ = SKIP)›,
+          have : ∃ cs', (c₁, s)↝cs', from ih₁ ‹(Γ ⊢₅ s)› ‹¬(c₁ = SKIP)›,
           cases' ‹∃ cs', (c₁, s)↝cs'› with cs',
           cases' cs' with c₁' s',
           
@@ -694,7 +739,7 @@ begin
         }
     },
     case ctypeIf : _ _ c₁ c₂ _ _ _ ih₁ ih₂ {
-      have : ∃ v, tbval b s v, from progress_bexp ‹(Γ ⊢₆ b)› ‹(Γ ⊢ₛ s)›,
+      have : ∃ v, tbval b s v, from progress_bexp ‹(Γ ⊢₆ b)› ‹(Γ ⊢₅ s)›,
       cases' ‹∃ v, tbval b s v› with bv,
 
       cases' bv,
@@ -714,28 +759,28 @@ begin
 end
 
 /--
-Teorema di correttezza del sistema di tipo: data l'esecuzione di un comando `c` ben tipato in uno stato `s` ben 
-tipato, o l'esecuzione é terminata, o é possibile compiere un ulteriore passo di calcolo (la computazione non
-si blocca).
-                                'Well typed programs cannot go wrong'.
+Teorema di correttezza del sistema di tipo: data l'esecuzione di un comando `c` ben tipato in uno 
+stato `s` ben tipato, o l'esecuzione é terminata, o é possibile compiere un ulteriore passo di 
+calcolo (la computazione non si blocca).
+                        'Well typed programs cannot go wrong'.
 -/
 theorem type_soundness {Γ : tyenv} {c c' : com} {s s' : pstate} {cs'' : conf} :
-  (c, s)↝*(c', s') → (Γ ⊢. c) → (Γ ⊢ₛ s) → ¬(c' = SKIP) → ∃ (cs'' : conf), (c', s')↝cs'':=
+  (c, s)↝*(c', s') → (Γ ⊢. c) → (Γ ⊢₅ s) → ¬(c' = SKIP) → ∃ (cs'' : conf), (c', s')↝cs'':=
 begin
   intros,
   induction' ‹(c, s)↝*(c', s')›,
     case refl : {
       show ∃ cs'', (c, s)↝cs'', from
-        progress_com ‹(Γ ⊢. c)› ‹(Γ ⊢ₛ s)› ‹¬(c = SKIP)›
+        progress_com ‹(Γ ⊢. c)› ‹(Γ ⊢₅ s)› ‹¬(c = SKIP)›
     },
     case step : _ c₃ c' _ s₃ s' _ _ _ {
       have : (Γ ⊢. c₃), from 
         preservation_com ‹(Γ ⊢. c)› ‹(c, s)↝(c₃, s₃)›,
 
-      have : (Γ ⊢ₛ s₃), from 
-        preservation_state ‹(Γ ⊢. c)› ‹(Γ ⊢ₛ s)› ‹(c, s)↝(c₃, s₃)›,
+      have : (Γ ⊢₅ s₃), from 
+        preservation_state ‹(Γ ⊢. c)› ‹(Γ ⊢₅ s)› ‹(c, s)↝(c₃, s₃)›,
 
       show ∃ cs'', (c', s')↝cs'', from
-        ih ‹(Γ ⊢. c₃)› ‹(Γ ⊢ₛ s₃)› ‹¬(c' = SKIP)› 
+        ih ‹(Γ ⊢. c₃)› ‹(Γ ⊢₅ s₃)› ‹¬(c' = SKIP)› 
     }
 end
