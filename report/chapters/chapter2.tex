@@ -275,22 +275,3 @@ inductive vector (α : Type u) : nat → Type u
 dove viene fornita simultaneamente la definizione dei tipi \mintinline{Lean}|vector 1|, \mintinline{Lean}|vector 2|, \mintinline{Lean}|vector 3| ...
 
 Ogni costruttore può istanziare un diverso elemento della famiglia e sfruttare un termine di un particolare elemento della famiglia per costruire un termine di un altro elemento, come nel caso di \mintinline{Lean}|cons|, che accetta un temine di tipo \mintinline{Lean}|vector n| e produce un termine di tipo \mintinline{Lean}|vector (succ n)|.
-
-\begin{comment}
-Una prova per induzione segue il medesimo principio, semplicemente il codominio $C\,n$ è un abitante di \begin{mintinline}{Lean} Prop \end{mintinline} e l'ipotesi induttiva è rappresentata dalla chiamata ricorsiva:
-
-Le parole chiave \begin{mintinline}{Lean} theorem \end{mintinline} e \begin{mintinline}{Lean} lemma \end{mintinline} sono versioni alternative di \begin{mintinline}{Lean} def \end{mintinline} nel caso di proposizioni.
-
-La Tabella 2.1 può essere estesa con i nuovi legami introdotti:
-\begin{center}
-\begin{tabular}{ | c | c | } 
-  \hline
-  \textbf{Logica} & \textbf{Teoria dei tipi} \\ 
-  \hline
-  Induzione & Ricorsione \\ 
-  \hline
-  Ipotesi induttiva & Chiamata ricorsiva \\ 
-  \hline
-\end{tabular}
-\end{center}
-\end{comment}

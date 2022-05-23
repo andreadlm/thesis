@@ -1,0 +1,264 @@
+Il seguente capitolo introduce un semplice linguaggio di programmazione imperativo, IMP, e ne definisce due tipologie di semantica: big-step e small-step, per poi provarne l'equivalenza.
+
+\section{Stati}
+In Lean uno stato è definito come una funzione da nomi di variabile in valori:
+\begin{minted}{Lean}
+abbreviation pstate := vname → val
+\end{minted}
+La funzione di aggiornamento dello stato assegna un nuovo valore ad una variabile:
+\begin{minted}{Lean}
+def state_update (s : pstate) (x : vname) 
+                 (v : val) : pstate :=
+  λ y, if (y = x) then v else s y
+\end{minted}
+La notazione \mintinline{Lean}|s [x  ↦ v]| viene introdotta ad indicare l'aggiornamento di uno stato \mintinline{Lean}|s| in cui la variabile \mintinline{Lean}|x| viene valorizzata a \mintinline{Lean}|v|.
+Un semplice stato può essere definito come segue:
+\begin{minted}{Lean}
+def simple_state : pstate := ["x" ↦ 1]["y" ↦ 2]["z" ↦ 3]
+
+#reduce simple_state "y"
+-- 2
+\end{minted}
+Si utilizza \mintinline{Lean}|emp| a denotare uno stato vuoto (uno stato che assegna ad ogni variabile il valore 0).
+
+\section{Espressioni}
+\subsection{Sintassi}
+Seguendo il principio della massima semplificazione del linguaggio, la sintassi delle espressioni aritmetiche viene definita in modo da contenere esclusivamente costanti numeriche, variabili e somme. In Lean viene formalizzata come segue:
+\begin{minted}{Lean}
+inductive aexp : Type
+| N    : ℕ → aexp
+| V    : vname → aexp
+| Plus : aexp → aexp → aexp
+\end{minted}
+Analogamente, un'espressione booleana può contenere costanti, negazione, congiunzione e confronto tra espressioni aritmetiche:
+\begin{minted}{Lean}
+inductive bexp : Type
+| Bc   : bool → bexp
+| Not  : bexp → bexp
+| And  : bexp → bexp → bexp
+| Less : aexp → aexp → bexp
+\end{minted}
+
+\begin{comment}
+Una semplice espressione booleana di confronto tra espressioni aritmetiche é codificabile come segue:
+\begin{minted}{Lean}
+Less ((Plus (V "x") (V "y"))) (N 1)
+\end{minted}
+\end{comment}
+
+\subsection{Semantica}
+La semantica di un'espressione è il suo valore. Il valore di un'espressione dipende dal valore associato alle variabili che compaiono nell'espressione stessa. Una funzione di valutazione associa ad una espressione un valore sulla base dello stato di valutazione:
+\begin{minted}{Lean}
+def aval : aexp → pstate → val
+| (N n)        _ := n
+| (V x)        s := s x
+| (Plus a₁ a₂) s := (aval a₁ s) + (aval a₂ s)
+\end{minted}
+Analogamente, per le espressioni booleane:
+\begin{minted}{Lean}
+def bval : bexp → pstate → bool
+| (Bc v)       _ := v
+| (Not b)      s := ¬(bval b s)
+| (And b₁ b₂)  s := (bval b₁ s) ∧ (bval b₂ s)
+| (Less a₁ a₂) s := (aval a₁ s) < (aval a₂ s)
+\end{minted}
+A questo punto è possibile chiedere a Lean di valutare espressioni di arbitraria complessità dato uno stato di valutazione:
+\begin{minted}{Lean}
+#reduce bval (Less ((Plus (N 0) (V "y"))) (N 1)) emp
+-- tt
+\end{minted}
+
+\section{Comandi}
+La sintassi dei comandi per il linguaggio di programmazione IMP è ridotta all'essenzuale e presenta i soli costrutti di assegnamento, composizione sequenziale (fondamentale per un linguaggio imperativo), ramificazione condizionale e ciclo (necessario a rendere il linguaggio Turing-completo). Per poter esprimere altre strutture sintattiche, come un \mintinline{Lean}{IF} senza \mintinline{Lean}{ELSE}, viene aggiunto il costrutto \mintinline{Lean}{SKIP} a denotare un'operazione senza alcun effetto:
+\begin{minted}{Lean}
+inductive com : Type
+| SKIP   : com
+| Assign : vname → aexp → com
+| Seq    : com → com → com
+| If     : bexp → com → com → com
+| While  : bexp → com → com
+\end{minted}
+Vengono intodotte alcune notazioni infisse per rendere la sintassi più leggibile: \mintinline{Lean}|::=| per l'assegnamento, \mintinline{Lean}|;;| per la composizione, \mintinline{Lean}|IF _ THEN _ ELSE| per la ramificazione condizionale e \mintinline{Lean}|WHILE _ DO _| per il ciclo.
+Un semplice programma con due assegnamenti può essere definito come segue:
+\begin{minted}{Lean}
+def progr : com :=
+  ("x" ::= Plus (V "y") (N 1) ;; "y" ::= (N 0))
+\end{minted}
+che equivale, in un linguaggio tradizionale, a:
+\begin{minted}{c}
+x = y + 1;
+y = 0;
+\end{minted}
+
+\section{Semantica operazionale big-step}
+La semantica operazionale big-step definisce una relazione ternaria tra comando, stato iniziale e stato finale. La relazione mostra l'esecuzione di un programma come se avvenisse in un unico grande passo, senza esplicitare le computazioni intermedie, che rimangono comunque visibili dall'albero di derivazione. La semantica viene definita come un predicato induttivo, che si traduce in Lean in una famiglia induttiva indicizzata sulla configurazione iniziale (coppia comando/stato) e sulla configurazione finale, mentre ogni costruttore rappresenta una regola di derivazione:
+\begin{comment}
+La definizione di una realazione è necessaria: una funzione di valutazione (un interprete) per IMP sarebbe per forza di cose una funzione parziale (ogni linguaggio Turing-completo ammette la non terminazione).
+\end{comment}
+
+\begin{minted}{Lean}
+inductive big_step : conf → pstate → Prop
+| Skip {s : pstate} : 
+  big_step (SKIP, s) s
+
+| Assign {s : pstate} {x : vname} {a : aexp} : 
+  big_step (x ::= a, s) (s[x ↦ aval a s])
+
+| Seq {c₁ c₂ : com} {s₁ s₂ s₃ : pstate} : 
+  big_step (c₁, s₁) s₂ →
+  big_step (c₂, s₂) s₃ → 
+  big_step (c₁ ;; c₂, s₁) s₃
+
+| IfTrue {b : bexp} {c₁ c₂ : com} {s t : pstate}  : 
+  bval b s →
+  big_step (c₁, s) t → 
+  big_step (IF b THEN c₁ ELSE c₂, s) t
+
+| IfFalse {b : bexp}  {c₁ c₂ : com} {s t : pstate} :
+  ¬ bval b s → 
+  big_step (c₂, s) t →
+  big_step (IF b THEN c₁ ELSE c₂, s) t
+
+| WhileFalse {b : bexp} {c : com} {s : pstate} :
+  ¬ bval b s →
+  big_step (WHILE b DO c, s) s
+
+| WhileTrue {b : bexp} {c : com} {s₁ s₂ s₃ : pstate } :
+  bval b s₁ →
+  big_step (c, s₁) s₂ →
+  big_step (WHILE b DO c, s₂) s₃ →
+  big_step (WHILE b DO c, s₁) s₃
+\end{minted}
+Viene introdotta la notazione infissa \mintinline{Lean}|(c, s) ⟹ t| per indicare una comando \mintinline{Lean}|c| la cui computazione inizia nello stato \mintinline{Lean}|s| e termina nello stato \mintinline{Lean}|t|, equivalente alla notazione prefissa \mintinline{Lean}|big_step c s t|. 
+
+L'esecuzione del programma \mintinline{Lean}|progr| può essere derivata entro il sistema come segue:
+\begin{minted}{Lean}
+def exec : (progr, emp) ⟹ ["x" ↦ 1]["y" ↦ 0] :=
+begin
+  apply big_step.Seq,
+  apply big_step.Assign,
+  apply big_step.Assign
+end
+\end{minted}
+
+Quanto definito è sufficiente a dimostrare semplici proprietà di comandi quali l'equivalenza:
+\begin{minted}{Lean}
+notation c₁ `∼` c₂ := 
+  ∀{s t : pstate}, (c₁, s) ⟹ t = (c₂, s) ⟹ t
+\end{minted}
+Un esempio è l'unfolding del \mintinline{Lean}|WHILE|:
+\begin{minted}{Lean}
+lemma eq_while_ifwhile {b : bexp} {c : com} : 
+  WHILE b DO c ∼ IF b THEN (c ;; WHILE b DO c) ELSE SKIP
+\end{minted}
+
+La prima proprietà del linguaggio dimostrata è il determinismo: un linguaggio si dice deterministico se per ogni stato iniziale e per ogni comando esiste al più uno stato finale. Al contrario, un linguaggio si dice non deterministico se per ogni combinazione tra stato iniziale e comando ammette più di uno stato finale di esecuzione. Formalmente, un linguaggio è determinista se due esecuzioni del medesimo comando nel medesimo stato iniziale terminano in due stati equivalenti:
+\begin{minted}{Lean}
+theorem deterministic {c : com} {s t r : pstate} :
+  (c, s) ⟹ t → (c, s) ⟹ r → (t = r)
+\end{minted}
+La dimostrazione è condotta per induzione su \mintinline{Lean}|(c, s) ⟹ t | tramite l'applicazione del tattico \mintinline{Lean}|induction'|. I casi \mintinline{Lean}|Skip| e \mintinline{Lean}|Assign| sono banali, al netto del ricorso al tattico \mintinline{Lean}|cases'| sulla seconda convergenza per rifinire \mintinline{Lean}|r| in accordo alle (uniche) regole di derivazione per i rispettivi comandi. Il caso \mintinline{Lean}|Seq| scompone \mintinline{Lean}|(c₁ ;; c₂, s) ⟹ r| nelle sue premesse (\mintinline{Lean}|cases'|), da cui la tesi segue per applicazione delle ipotesi induttive e riscrittura delle ipotesi nel contesto locale (\mintinline{Lean}|rw|) in accordo ai risultati intermedi. I casi \mintinline{Lean}|IfTrue| e \mintinline{Lean}|IfFalse| analizzano le possibili derivazioni di \mintinline{Lean}|(IF b THEN c₁ ELSE c₂, s) ⟹ r|, che possono terminare con le regole \mintinline{Lean}|IfTrue| e  \mintinline{Lean}|IfFalse|: se entrambe le derivazioni  \mintinline{Lean}|(c, s) ⟹ t| e \mintinline{Lean}|(c, s) ⟹ r| terminano con la stessa regola, la tesi segue dall'applicazione dell'ipotesi induttiva, altrimenti si genera una contraddzione (\mintinline{Lean}|trivial|). Le dimostrazioni per i casi \mintinline{Lean}|WhileTrue| e \mintinline{Lean}|WhileFalse| sfruttano le stesse idee applicate agli altri casi.
+\section{Semantica operazionale small-step}
+La semantica operazionale big-step mostra l'esecuzione di un comando come se avvenisse in un unico grande passo, tralasciando i passi intermedi (a meno di analizzare l'albero di derivazione); scopo della semantica small-step è rappresentare l'esecuzione come una sequenza di passi, tramite una a relazione tra due configurazioni ispirata alla riduzione del $\lambda$-calcolo e permettere eventualmente di descrivere computazioni non terminanti. Ogni regola definisce un singolo passo di esecuzione che consuma una parte (o tutto) il comando e può alterare lo stato. Il comando \mintinline{Lean}|SKIP| indica una computazione terminata. In Lean la semantica viene definita tramite una famiglia induttiva indicizzata sulle due configurazioni:
+\begin{minted}{Lean}
+inductive small_step : conf → conf → Prop
+| Assign  {s : pstate} {x : vname} {a : aexp} :
+  small_step (x ::= a, s) (SKIP, s[x ↦ aval a s])
+
+| Seq1 {c₂ : com} {s : pstate} :
+  small_step (SKIP ;; c₂, s) (c₂, s)
+
+| Seq2 {c₁ c₁' c₂ : com} {s s' : pstate} :
+  small_step (c₁, s) (c₁', s') →
+  small_step (c₁ ;; c₂, s) (c₁' ;; c₂, s')
+
+| IfTrue {b : bexp} {s : pstate} {c₁ c₂ : com}:
+  bval b s →
+  small_step (IF b THEN c₁ ELSE c₂, s) (c₁, s)
+
+| IfFalse {b : bexp} {s : pstate} {c₁ c₂ : com}:
+  ¬bval b s →
+  small_step (IF b THEN c₁ ELSE c₂, s) (c₂, s)
+
+| While {b : bexp} {c : com} {s : pstate} :
+  small_step (WHILE b DO c, s) (IF b THEN (c ;; WHILE b DO c) ELSE SKIP, s)
+\end{minted}
+Viene introdotta la notazione infissa \mintinline{Lean}|(c, s)↝(c', s')| a indicare un singolo passo di esecuzione del comando \mintinline{Lean}|c| nello stato \mintinline{Lean}|s|.
+
+L'esecuzione di un programma di compone di una sequenza (potenzialmente infinita) di passi atomici: nel contesto della semantica small-step, viene definita come la chiusura riflessiva e transitiva della relazione \mintinline{Lean}|↝|:
+\begin{minted}{Lean}
+inductive small_step_star : conf → conf → Prop
+| refl {c : com} {s : pstate} : 
+  small_step_star (c, s) (c, s)
+
+| step {c c₁ c₂ : com} {s s₁ s₂ : pstate}:
+  small_step (c, s) (c₁, s₁) →
+  small_step_star (c₁, s₁) (c₂, s₂) →
+  small_step_star (c, s) (c₂, s₂)
+\end{minted}
+Viene introdotta la notazione \mintinline{Lean}|(c, s)↝*(c', s')| a rappresentare una riduzione in zero o più passi di calcolo.
+
+In Lean l'utilizzo dell'ambiente \mintinline{Lean}|calc| si presta bene alla rappresentazione di una sequenza di passi di riduzione.  Si rende pertanto necessario provare al sistema le proprietà di transitivà per \mintinline{Lean}|↝| e \mintinline{Lean}|↝*| e taggarle con \mintinline{Lean}|@[trans]|:
+\begin{minted}{Lean}
+@[trans]
+lemma small_step_star_small_step_star_trans {cf cf₁ cf₂: conf} :
+  cf ↝* cf₁ → cf₁ ↝* cf₂ → cf ↝* cf₂
+\end{minted}
+\vspace{-2em}
+\begin{minted}{Lean}
+@[trans]
+lemma small_step_star_small_step_trans {cf cf₁ cf₂: conf} :
+  cf ↝* cf₁ → cf₁ ↝ cf₂ → cf ↝* cf₂ 
+\end{minted}
+ecc. 
+
+L'esecuzione del programma \mintinline{Lean}|progr| può essere rappresentata mediante una composizione di passi small-step come segue:
+\begin{minted}{Lean}
+def exec : (progr, emp)↝*(SKIP, ["x" ↦ 1]["y" ↦ 0]) :=
+  calc
+    (progr, emp)↝(SKIP ;; "y" ::= (N 0), ["x" ↦ 1]) : 
+      small_step.Seq2 (small_step.Assign)
+    ...             ↝("y" ::= (N 0), ["x" ↦ 1]) :
+      small_step.Seq1
+    ...             ↝(SKIP, ["x" ↦ 1]["y" ↦ 0]) :
+      small_step.Assign
+\end{minted}
+
+La dimostrazione del determinismo può essere ripetuta nel caso della semantica small-step:
+\begin{minted}{Lean}
+theorem deterministic {c : com} {s : pstate} {cs₁ cs₂ : conf} : 
+  (c, s)↝cs₁ → (c, s)↝cs₂ → cs₁ = cs₂
+\end{minted}
+La dimostrazione è condotta per induzione su \mintinline{Lean}|(c, s)↝cs₁|. Gli unici due casi che richiedano attenzioni sono \mintinline{Lean}|Seq1| e \mintinline{Lean}|Seq2|: viene analizzata, rispettivamente, la derivazione di \mintinline{Lean}|(SKIP ;; c₂, s)↝cs₂| e \mintinline{Lean}|(c₁ ;; c₂, s)↝cs₂|. Nel primo caso il tattico \mintinline{Lean}|cases'| genera due goal, uno per possibile costruttore (\mintinline{Lean}|Seq1| e \mintinline{Lean}|Seq2|), ma il caso in cui la derivazione termini in \mintinline{Lean}|Seq2| è chiaramente impossibile e tale contraddizione viene evidenziata al sistema provando a scomporre l'ipotesi introdotta \mintinline{Lean}|(SKIP, s)↝(c₁', s')| sui suoi possibili costruttori (ovvero, nessuno). Ragionamento simile viene fatto nel caso discorde di \mintinline{Lean}|Seq2|, mentre se la derivazione di \mintinline{Lean}|(c₁ ;; c₂, s)↝cs₂| termina in \mintinline{Lean}|Seq2|,  l'ipotesi induttiva permette di ottenere \mintinline{Lean}|(c₁', s') = (c₁'', s'')|, da cui, per l'applicazione del tattico\mintinline{Lean}|injection|, \mintinline{Lean}|c₁' = c₁''| e \mintinline{Lean}|s' = s''|. La tesi segue per riscrittura.
+
+\section{Equivalenza tra le semantiche}
+Dopo aver introdotto due diverse semantiche per IMP, è necessario dimostrare la loro equivalenza, ovvero, che per ogni esecuzione big-step esista una sequenza di passi di riduzione small-step e viceversa:
+\begin{minted}{Lean}
+theorem big_step_equiv_small_step {c : com} 
+                                  {s t : pstate} :
+  (c, s) ⟹ t ↔ (c, s)↝*(SKIP, t)
+\end{minted}
+La dimostrazione è suddivisa in quattro lemmi intermedi.
+Il primo lemma dimostra uno dei due versi del teorema di equivalenza, mostrando come ogni esecuzione big-step possa essere simulata da una sequenza di zero o più passi small-step :
+\begin{minted}{Lean}
+lemma big_step_imp_small_step {c : com} {s t : pstate} : 
+  (c, s) ⟹ t → (c, s)↝*(SKIP, t)
+\end{minted}
+la dimostrazione procede per induzione su \mintinline{Lean}|(c, s) ⟹ t|, l'unico caso che richieda un'analisi più approfondita è \mintinline{Lean}|Seq|, per il quale viene dimostrato un lemma intermedio, considerabile un'estensione della regola \mintinline{Lean}|Seq2| ad un numero indeterminato di passi:
+\begin{minted}{Lean}
+lemma seq_star {c c₁ c₂ : com} {s₁ s₂ : pstate} :
+  (c₁, s₁)↝*(c, s₂) → (c₁ ;; c₂, s₁)↝*(c ;; c₂, s₂) 
+\end{minted}
+
+Il terzo lemma dimostra il secondo verso del teorema di equivalenza:
+\begin{minted}{Lean}
+lemma small_step_imp_big_step {c : com} {s t : pstate} :
+  (c, s)↝*(SKIP, t) → (c, s) ⟹ t
+\end{minted}
+la dimostrazione è per induzione sulla relazione \mintinline{Lean}|(c, s)↝*(SKIP, t)|:  il caso base è banale, nel caso induttivo gli argomenti del costruttore sono \mintinline{Lean}|(c, s)↝(c₁, s₁)| e \mintinline{Lean}|(c₁, s₁)↝*(SKIP, t)| da cui, per ipotesi induttiva, \mintinline{Lean}|(c₁, s₁) ⟹ t|. La tesi segue dal seguente lemma accessorio, che compone un singolo passo di riduzione small-step con una convergenza big-step:
+\begin{minted}{Lean}
+lemma step_case {c c₁ : com} {s s₁ t : pstate} : 
+  (c, s)↝(c₁, s₁) → (c₁, s₁) ⟹ t → (c, s) ⟹ t
+\end{minted}
+
+Il teorema \mintinline{Lean}|big_step_equiv_small_step| può essere considerato un corollario dei due lemmi \mintinline{Lean}|big_step_imp_small_step| e \mintinline{Lean}|small_step_imp_big_step|, concludendo la dimostrazione dell'equivalenza delle due semantiche.
