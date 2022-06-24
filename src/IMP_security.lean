@@ -149,7 +149,7 @@ begin
       dsimp[secₐ] at *,
 
       show aval (V x) s = aval (V x) t, by
-        simp_rw[aval, ‹s = t [<= l]› x ‹sec x ≤ l›]
+        simp[aval, ‹s = t [<= l]› x ‹sec x ≤ l›]
     },
     case Plus : a₁ a₂ ih₁ ih₂ {
       dsimp[secₐ] at *,
@@ -162,7 +162,7 @@ begin
       have : aval a₂ s = aval a₂ t, from ih₂ ‹s = t [<= l]› ‹(secₐ a₂ <= l)›,
 
       show aval (Plus a₁ a₂) s = aval (Plus a₁ a₂) t, by
-        simp_rw[aval, ‹aval a₁ s = aval a₁ t›, ‹aval a₂ s = aval a₂ t›]
+        simp[aval, ‹aval a₁ s = aval a₁ t›, ‹aval a₂ s = aval a₂ t›]
     }
 end
 
@@ -180,7 +180,7 @@ begin
       have : bval b s = bval b t, from ih ‹s = t [<= l]› ‹sec₆ b ≤ l›,
 
       show bval (Not b) s = bval (Not b) t, by 
-        simp_rw[bval, ‹bval b s = bval b t›]
+        simp[bval, ‹bval b s = bval b t›]
     },
     case And : b₁ b₂ ih₁ ih₂ {
       dsimp[sec₆] at *,
@@ -193,7 +193,7 @@ begin
       have : bval b₂ s = bval b₂ t, from ih₂ ‹s = t [<= l]› ‹sec₆ b₂ ≤ l›,
 
       show bval (And b₁ b₂) s = bval (And b₁ b₂) t, by
-        simp_rw[bval, ‹bval b₁ s = bval b₁ t›, ‹bval b₂ s = bval b₂ t›]
+        simp[bval, ‹bval b₁ s = bval b₁ t›, ‹bval b₂ s = bval b₂ t›]
     },
     case Less : a₁ a₂ {
       dsimp[sec₆] at *,
@@ -208,7 +208,7 @@ begin
         noninterference_aexp ‹s = t [<= l]› ‹(secₐ a₂ <= l)›,
 
       show bval (Less a₁ a₂) s = bval (Less a₁ a₂) t, by
-        simp_rw[bval, ‹aval a₁ s = aval a₁ t›, ‹aval a₂ s = aval a₂ t›]
+        simp[bval, ‹aval a₁ s = aval a₁ t›, ‹aval a₂ s = aval a₂ t›]
     }
 end
 
@@ -284,7 +284,7 @@ inductive sec_type : lv → com → Prop
   sec_type l (IF b THEN c₁ ELSE c₂)
 
 | While {b : bexp} {l : lv} {c : com} :
-  sec_type (max l(sec₆ b)) c →
+  sec_type (max l (sec₆ b)) c →
   sec_type l (WHILE b DO c)
 
 infix ` ⊢. `:50 := sec_type
