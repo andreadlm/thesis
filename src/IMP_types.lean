@@ -608,7 +608,7 @@ begin
   intros,
   induction' ‹(Γ ⊢. c)›,
     case ctypeSKIP : {
-      cases ‹(SKIP, s)↝(c', s')› -- impossibile
+      cases' ‹(SKIP, s)↝(c', s')› -- impossibile
     },
     case ctypeAssign : {
       cases' ‹(x ::= a, s)↝(c', s')›,
