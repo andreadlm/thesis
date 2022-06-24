@@ -92,16 +92,12 @@ begin
       trivial
     },
     case V : x {
-      dsimp[secₐ] at *,
-
       show aval (V x) s = aval (V x) t, by
         simp[aval, ‹s = t [<= l]› x ‹sec x ≤ l›]
     },
     case Plus : a₁ a₂ ih₁ ih₂ {
-      dsimp[secₐ] at *,
-
-      have : (secₐ a₁ <= l) ∧ (secₐ a₂ <= l), by 
-        simpa using ‹max (secₐ a₁) (secₐ a₂) ≤ l›,
+      have : (secₐ a₁ <= l) ∧ (secₐ a₂ <= l), from
+         max_le_iff.elim_left ‹max (secₐ a₁) (secₐ a₂) ≤ l›,
       cases' ‹(secₐ a₁ <= l) ∧ (secₐ a₂ <= l)›,
 
       have : aval a₁ s = aval a₁ t, from ih₁ ‹s = t [<= l]› ‹(secₐ a₁ <= l)›,
@@ -121,18 +117,15 @@ begin
       trivial
     },
     case Not : {
-      dsimp[sec₆] at *,
-
-      have : bval b s = bval b t, from ih ‹s = t [<= l]› ‹sec₆ b ≤ l›,
+      have : bval b s = bval b t, from 
+        ih ‹s = t [<= l]› ‹sec₆ b ≤ l›,
 
       show bval (Not b) s = bval (Not b) t, by 
         simp[bval, ‹bval b s = bval b t›]
     },
     case And : b₁ b₂ ih₁ ih₂ {
-      dsimp[sec₆] at *,
-
-      have : (sec₆ b₁ <= l) ∧ (sec₆ b₂ <= l), by
-        simpa using ‹max (sec₆ b₁) (sec₆ b₂) <= l›,
+      have : (sec₆ b₁ <= l) ∧ (sec₆ b₂ <= l), from
+        max_le_iff.elim_left ‹max (sec₆ b₁) (sec₆ b₂) <= l›,
       cases' ‹(sec₆ b₁ <= l) ∧ (sec₆ b₂ <= l)›,
 
       have : bval b₁ s = bval b₁ t, from ih₁ ‹s = t [<= l]› ‹sec₆ b₁ ≤ l›,
@@ -142,10 +135,8 @@ begin
         simp[bval, ‹bval b₁ s = bval b₁ t›, ‹bval b₂ s = bval b₂ t›]
     },
     case Less : a₁ a₂ {
-      dsimp[sec₆] at *,
-
-      have : (secₐ a₁ <= l) ∧ (secₐ a₂ <= l), by
-        simpa using ‹max (secₐ a₁) (secₐ a₂) <= l›,
+      have : (secₐ a₁ <= l) ∧ (secₐ a₂ <= l), from
+        max_le_iff.elim_left ‹max (secₐ a₁) (secₐ a₂) ≤ l›,
       cases' ‹(secₐ a₁ <= l) ∧ (secₐ a₂ <= l)›,
 
       have : aval a₁ s = aval a₁ t, from 
