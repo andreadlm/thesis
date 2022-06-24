@@ -2,6 +2,7 @@
 Authore: Andrea Delmastro
 -/
 import tactic.induction
+import IMP_state
 
 /-!
 # Semantica per IMP
@@ -67,6 +68,30 @@ def emp : pstate := (λ _, 0)
 
 notation s `[` x ` ↦ ` v `]`:100 := state_update s x v
 notation   `[` x ` ↦ ` v `]`     := emp [x ↦ v]
+
+/--
+Lemma tecnico utile all'utilizzo del tattico `simp` per l'applicazione degli stati.
+-/
+@[simp] lemma apply_state_update_pos {x y : vname} {s : pstate} {v : val} :
+  (y = x) → s[x ↦ v] y = v := 
+begin
+  intro,
+  dsimp[state_update],
+  apply if_pos,
+  assumption
+end
+
+/--
+Lemma tecnico utile all'utilizzo del tattico `simp` per l'applicazione degli stati.
+-/
+@[simp] lemma apply_state_update_neg {x y : vname} {s : pstate} {v : val} :
+  ¬(y = x) → s[x ↦ v] y = (s y) :=
+begin
+  intro,
+  dsimp[state_update],
+  apply if_neg,
+  assumption
+end
 
 /-!
 ### Espressioni aritmetiche
