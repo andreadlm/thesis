@@ -2,65 +2,11 @@ import tactic.induction
 import order.min_max
 import data.nat.basic
 
-abbreviation vname  := string
-abbreviation val    := ℕ
-abbreviation pstate := vname → val
-
-inductive aexp : Type
-| N    : ℕ → aexp
-| V    : vname → aexp
-| Plus : aexp → aexp → aexp
-
+import IMP_op_sem
 open aexp
-
-def aval : aexp → pstate → val
-| (N n)        _ := n
-| (V x)        s := s x
-| (Plus a₁ a₂) s := (aval a₁ s) + (aval a₂ s)
-
-def state_update (s : pstate) (x : vname) (v : val) : pstate :=
-  λ y, if (y = x) then v else s y
-
-notation s `[` x ` ↦ ` v `]`:100 := state_update s x v
-notation   `[` x ` ↦ ` v `]` := (λ _, 0 ) [x ↦ v]
-
-/--
-Lemma tecnico utile all'utilizzo del tattico `simp` per l'applicazione degli stati
--/
-@[simp] def apply_state_update_pos {x y : vname} {s : pstate} {v : val} :
-  (y = x) → s[x ↦ v] y = v := 
-begin
-  intro,
-  dsimp[state_update],
-  apply if_pos,
-  assumption
-end
-
-/--
-Lemma tecnico utile all'utilizzo del tattico `simp` per l'applicazione degli stati
--/
-@[simp] def apply_state_update_neg {x y : vname} {s : pstate} {v : val} :
-  ¬(y = x) → s[x ↦ v] y = (s y) :=
-begin
-  intro,
-  dsimp[state_update],
-  apply if_neg,
-  assumption
-end
-
-inductive bexp : Type
-| Bc   : bool → bexp
-| Not  : bexp → bexp
-| And  : bexp → bexp → bexp
-| Less : aexp → aexp → bexp
-
 open bexp
-
-def bval : bexp → pstate → bool
-| (Bc v)       _ := v
-| (Not b)      s := ¬(bval b s)
-| (And b₁ b₂)  s := (bval b₁ s) ∧ (bval b₂ s)
-| (Less a₁ a₂) s := (aval a₁ s) < (aval a₂ s)
+open com
+open big_step
 
 abbreviation lv := ℕ
 
@@ -211,58 +157,6 @@ begin
         simp[bval, ‹aval a₁ s = aval a₁ t›, ‹aval a₂ s = aval a₂ t›]
     }
 end
-
-inductive com : Type
-| SKIP   : com
-| Assign : vname → aexp → com
-| Seq    : com → com → com
-| If     : bexp → com → com → com
-| While  : bexp → com → com
-
-infix ` ::= `:68                                    := com.Assign
-infix ` ;; `:67                                     := com.Seq
-notation `IF `:0 b ` THEN `:0 c₁ ` ELSE `:68 c₂:68  := com.If b c₁ c₂
-notation `WHILE `:0 b ` DO `:68 c:68                := com.While b c
-
-abbreviation conf := com × pstate
-
-open com
-
-inductive big_step : conf → pstate → Prop
-| Skip {s : pstate} : 
-  big_step (SKIP, s) s
-
-| Assign {s : pstate} {x : vname} {a : aexp} : 
-  big_step (x ::= a, s) (s[x ↦ aval a s])
-
-| Seq {c₁ c₂ : com} {s₁ s₂ s₃ : pstate} : 
-  big_step (c₁, s₁) s₂ →
-  big_step (c₂, s₂) s₃ → 
-  big_step (c₁ ;; c₂, s₁) s₃
-
-| IfTrue {b : bexp} {c₁ c₂ : com} {s t : pstate}  : 
-  bval b s →
-  big_step (c₁, s) t → 
-  big_step (IF b THEN c₁ ELSE c₂, s) t
-
-| IfFalse {b : bexp}  {c₁ c₂ : com} {s t : pstate} :
-  ¬ bval b s → 
-  big_step (c₂, s) t →
-  big_step (IF b THEN c₁ ELSE c₂, s) t
-
-| WhileFalse {b : bexp} {c : com} {s : pstate} :
-  ¬ bval b s →
-  big_step (WHILE b DO c, s) s
-
-| WhileTrue {b : bexp} {c : com} {s₁ s₂ s₃ : pstate } :
-  bval b s₁ →
-  big_step (c, s₁) s₂ →
-  big_step (WHILE b DO c, s₂) s₃ →
-  big_step (WHILE b DO c, s₁) s₃
-
-infix ` ⟹ `:70 := big_step
-
-open big_step
 
 inductive sec_type : lv → com → Prop
 | Skip {l : lv} : 
