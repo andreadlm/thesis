@@ -1,3 +1,6 @@
+/-
+Authore: Andrea Delmastro
+-/
 import tactic.induction
 import order.min_max
 import data.nat.basic
@@ -8,16 +11,66 @@ open bexp
 open com
 open big_step
 
+/-!
+# Tipi per la sicurezza per IMP
+
+Questo file definisce un sistema di tipi per IMP per garantire una semplice proprietà di sicurezza: 
+l’assenza di flussi di dati privati verso osservatori pubblici, e ne prova la correttezza.
+
+## Note di implementazione
+
+Questo file utilizza i tattici `cases'` e `induction'` definiti in `tactic.induction`. 
+Nonostante le medesime dimostrazioni siano ottenibili tramite i tattici `cases` e `induction` 
+classici, le due versioni qui utilizzate meglio si prestano all'utilizzo con predicati induttivi e 
+sono più 'naturali' rispetto alla medesima dimostrazione svolta su carta.
+
+## Notazione
+
+* `vname` : nome di variabile, `string`
+* `val` : valore di un'espressione, `ℕ`
+* `pstate` : stato di programma, funzione da `vname` a `val`
+* `emp` : stato vuoto, assegna ad ogni variabile il valore 0
+* `lv` : livello di sicurezza, `ℕ`
+* `s [ x  ↦  v ]` : aggiornamento dello stato `s`, con assegnazione di `v` a `x`
+* `::=` : comando di assegnamento
+* `;;` : concatenazione sequenziale di comandi
+* `IF THEN ELSE` : comando ramificazione condizionale
+* `WHILE DO` : comando di ciclo
+* `conf` : configurazione, coppia `com × pstate`
+* `⟹` : relazione big-step
+
+## Risultati principali
+
+* `noninterference : ∀ {c : com} {s s' t t' : pstate} {l : lv}, (c, s) ⟹ s' → (c, t) ⟹ t' → (0 ⊢. c) → s = t [<= l] → s' = t' [<= l]`
+
+## Riferimenti
+
+* [Nipkow, Klein, Concrete Semantics with Isabelle/HOL][Nipkow]
+-/
+
+
 abbreviation lv := ℕ
 
+/--
+Funzione che associa ad ogni variabile un livello di sicurezza determinato dalla lunghezza del
+suo nome.
+-/
 def sec : vname → lv :=
   λ (x : vname), x.length
 
+/--
+Funzione che associa ad ogni espressione aritmetica un livello di sicurezza calcolato come il
+massimo tra i livelli di sicurezza delle variabili che vi compaiono.
+-/
 def secₐ : aexp → lv
 | (N n)        := 0
 | (V x)        := sec x
 | (Plus a₁ a₂) := max (secₐ a₁) (secₐ a₂)
 
+/--
+Funzione che associa ad ogni espressione booleana un livello di sicurezza calcolato come il
+massimo tra i livelli di sicurezza delle variabili che vi compaiono.
+-/
 def sec₆ : bexp → lv
 | (Bc v)       := 0
 | (Not b)      := sec₆ b
@@ -28,6 +81,13 @@ notation s ` = ` t ` [<= ` l `]` := ∀ (z : vname), (sec z <= l) → s z = t z
 notation s ` = ` t ` [< ` l `]` := ∀ (z : vname), (sec z < l) → s z = t z
 
 namespace state_eq_below_lv
+
+/-!
+### Equivalenza tra stati al di sotto di una soglia di sicurezza (<)
+
+Vengono dimostrate alcune semplici proprietà relativamente alle definizioni di equivalenza tra stati 
+al di sotto di una soglia di sicurezza.
+-/
 
 lemma refl {s : pstate} {l : lv} : s = s [< l] :=
 begin
@@ -54,7 +114,16 @@ end
 
 end state_eq_below_lv
 
+open state_eq_below_lv
+
 namespace state_eq_beloweq_lv
+
+/-!
+### Equivalenza tra stati al di sotto di una soglia di sicurezza (<=)
+
+Vengono dimostrate alcune semplici proprietà relativamente alle definizioni di equivalenza tra stati 
+al di sotto di una soglia di sicurezza.
+-/
 
 lemma refl {s : pstate} {l : lv} : s = s [<= l] :=
 begin
@@ -80,9 +149,13 @@ end
 
 end state_eq_beloweq_lv
 
-open state_eq_below_lv
 open state_eq_beloweq_lv
 
+/--
+Lemma di noninterferenza per espressioni aritmetiche: la valutazione di un'espressione aritmetica
+in due stati uguali al di sotto di una soglia di sicurezza produce il medesimo valore se il livello 
+di sicurezza associato all'espressione è al di sotto della soglia.
+-/
 lemma noninterference_aexp {s t : pstate} {l : lv} {a : aexp} :
   s = t [<= l] → (secₐ a <= l) → (aval a s = aval a t) :=
 begin
@@ -108,6 +181,11 @@ begin
     }
 end
 
+/--
+Lemma di noninterferenza per espressioni booleane: la valutazione di un'espressione booleana
+in due stati uguali al di sotto di una soglia di sicurezza produce il medesimo valore se il livello 
+di sicurezza associato all'espressione è al di sotto della soglia.
+-/
 lemma noninterference_bexp {s t : pstate} {l : lv} {b : bexp} :
   s = t [<= l] → (sec₆ b <= l) → (bval b s = bval b t) :=
 begin
@@ -149,6 +227,15 @@ begin
     }
 end
 
+
+/-!
+### Giudizi per i comandi
+
+Il sistema permette di derivare giudizi della forma: `l ⊢. c` se ogni flusso di informazione
+entro `c` è crescente rispetto al livello di sicurezza (da livello basso a livello alto) e avviene 
+verso variabili di livello maggiore o uguale a `l`.
+-/
+
 inductive sec_type : lv → com → Prop
 | Skip {l : lv} : 
   sec_type l SKIP
@@ -176,6 +263,10 @@ infix ` ⊢. `:50 := sec_type
 
 open sec_type
 
+/--
+Lemma di anti monotonicità: è possibile abbassare il livello sotto il quale non sono permessi
+assegnamenti, mantenendo il comando ben tipato.
+-/
 lemma anti_monotonicity {l l' : lv} {c : com} :
   (l ⊢. c) → (l' <= l) → (l' ⊢. c) :=
 begin
@@ -213,6 +304,10 @@ begin
     }
 end
 
+/--
+Lemma di confinamento: un comando `c` ben tipato in un livello `l` ha effetto esclusivamente sulle
+variabili di livello superiore o ugale a `l`. 
+-/
 lemma confinement {c : com} {s t : pstate} {l : lv} :
   (c, s) ⟹ t → (l ⊢. c) → s = t [< l] :=
 begin
@@ -221,20 +316,20 @@ begin
     case Skip : {
       show t = t [< l], from refl
     },
-    case Assign : { -- TODO: migliorabile?
+    case Assign : {
       intros,
 
       cases' ‹l ⊢. x ::= a›,
     
-      have : (z = x) ∨ ¬(z = x), from em (z = x),
-      cases' ‹(z = x) ∨ ¬(z = x)›,
+      have : (z = x) ∨ (z ≠ x), from em (z = x),
+      cases' ‹(z = x) ∨ (z ≠ x)›,
         case or.inl : {
           rw ‹z = x› at *,
           have : ¬(sec x < l), from not_lt_of_le ‹l ≤ sec x›,
           contradiction
         },
         case or.inr : {
-          show t z = t[x ↦ aval a t] z, by simp[‹¬(z = x)›]
+          show t z = t[x ↦ aval a t] z, by simp[‹z ≠ x›]
         }
     },
     case Seq :  _ _ s s' t _ _ ih₁ ih₂{
@@ -277,6 +372,11 @@ begin
     }
 end
 
+/--
+Teorema di non interferenza: dimostra la correttezza del sistema di tipi, mostrando come la
+gli output inferiori o uguali ad una data soglia di sicurezza `l` non siano influenzati dagli
+input di livello superiore a `l`.
+-/
 theorem noninterference {c : com} {s s' t t' : pstate} {l : lv}:
   (c, s) ⟹ s' → (c, t) ⟹ t' → (0 ⊢. c) → s = t [<= l] → s' = t' [<= l] :=
 begin
@@ -289,15 +389,15 @@ begin
 
       show s' = t' [<= l], by assumption
     },
-    case Assign : s _ _ { -- TODO: migliorabile?
+    case Assign : s _ _ {
       intros,
       cases' ‹(x ::= a, t) ⟹ t'› with _ t _,
       cases' ‹0 ⊢. x ::= a›,
 
       have : (sec x <= l) ∨ (sec x > l), from le_or_lt (sec x) l,
-      have : (z = x) ∨ ¬(z = x), from em (z = x),
+      have : (z = x) ∨ (z ≠ x), from em (z = x),
 
-      cases' ‹(z = x) ∨ ¬(z = x)›,
+      cases' ‹(z = x) ∨ (z ≠ x)›,
         case inl : { 
           simp[‹z = x›] at *,
           cases' ‹(sec x <= l) ∨ (sec x > l)›,
@@ -311,7 +411,7 @@ begin
             }
         },
         case inr : {
-          simp[‹¬(z = x)›],
+          simp[‹z ≠ x›],
           show s z = t z, from ‹s = t [<= l]› z ‹sec z ≤ l› 
         }
     },
