@@ -25,6 +25,7 @@ sono più 'naturali' rispetto alla medesima dimostrazione svolta su carta.
 * `vname` : nome di variabile, `string`
 * `val` : valore di un'espressione, `ℕ`
 * `pstate` : stato di programma, funzione da `vname` a `val`
+* `emp` : stato vuoto, assegna ad ogni variabile il valore 0
 * `s[x ↦ v]` : aggiornamento dello stato `s`, con assegnazione di `v` a `x`
 * `::=` : comando di assegnamento
 * `;;` : comando di concatenazione sequenziale tra comandi
@@ -44,8 +45,8 @@ sono più 'naturali' rispetto alla medesima dimostrazione svolta su carta.
 
 * `progress_aexp {Γ : tyenv} {a : aexp} {τ : ty} {s : pstate} : (Γ ⊢ₐ a : τ) → (Γ ⊢₅ s) → ∃ (v : val), taval a s v`
 * `progress_bexp {Γ : tyenv} {b : bexp} {s : pstate} : (Γ ⊢₆ b) → (Γ ⊢₅ s) → ∃ (v : bool), tbval b s v`
-* `progress_com {Γ : tyenv} {c : com} { s: pstate} : (Γ ⊢. c) → (Γ ⊢₅ s) → ¬(c = SKIP) → ∃ (cs' : conf), (c, s)↝cs'`
-* `type_soundness {Γ : tyenv} {c c' : com} {s s' : pstate} {cs'' : conf} : (c, s)↝*(c', s') → (Γ ⊢. c) → (Γ ⊢₅ s) → ¬(c' = SKIP) → ∃ (cs'' : conf), (c', s')↝cs''`
+* `progress_com {Γ : tyenv} {c : com} { s: pstate} : (Γ ⊢. c) → (Γ ⊢₅ s) → (c ≠ SKIP) → ∃ (cs' : conf), (c, s)↝cs'`
+* `type_soundness {Γ : tyenv} {c c' : com} {s s' : pstate} {cs'' : conf} : (c, s)↝*(c', s') → (Γ ⊢. c) → (Γ ⊢₅ s) → (c' ≠ SKIP) → ∃ (cs'' : conf), (c', s')↝cs''`
 
 ## Riferimenti
 
@@ -95,7 +96,7 @@ end
 Lemma tecnico utile all'utilizzo del tattico `simp` per l'applicazione degli stati.
 -/
 @[simp] lemma apply_state_update_neg {x y : vname} {s : pstate} {v : val} :
-  ¬(y = x) → s[x ↦ v] y = (s y) :=
+  (y ≠ x) → s[x ↦ v] y = (s y) :=
 begin
   intro,
   dsimp[state_update],
@@ -659,16 +660,16 @@ begin
         preservation_aexp ‹(Γ ⊢ₐ a : Γ x)› ‹taval a s v› ‹(Γ ⊢₅ s)›,
 
       assume y : vname,
-      have : (y = x) ∨ ¬(y = x), from em (y = x),
+      have : (y = x) ∨(y ≠ x), from em (y = x),
 
-      cases' ‹(y = x) ∨ ¬(y = x)›,
+      cases' ‹(y = x) ∨ (y ≠ x)›,
         case or.inl : { -- y = x
           have : (s[x ↦ v] y) = v, by simp[‹y = x›],
           rw[‹(s[x ↦ v] y) = v›, ‹y = x›],
           
           show type v = Γ x , by assumption
         },
-        case or.inr : { -- ¬(y = x)
+        case or.inr : { -- y ≠ x
           have : (s[x ↦ v] y) = s y, by simp[‹¬y = x›],
           rw[‹s[x ↦ v] y = s y›],
 
@@ -706,7 +707,7 @@ Teorema di progresso per comandi: se un comando `c` diverso da `SKIP` ben tipato
 un contesto `s` ben tipato, allora il programma esegue per almeno un passo di calcolo.
 -/
 lemma progress_com {Γ : tyenv} {c : com} { s: pstate} :
-  (Γ ⊢. c) → (Γ ⊢₅ s) → ¬(c = SKIP) → ∃ (cs' : conf), (c, s)↝cs' :=
+  (Γ ⊢. c) → (Γ ⊢₅ s) → (c ≠ SKIP) → ∃ (cs' : conf), (c, s)↝cs' :=
 begin
   intros,
   induction' ‹(Γ ⊢. c)›,
@@ -721,15 +722,15 @@ begin
         ⟨ (SKIP,  s[x ↦ v]), Assign ‹taval a s v› ⟩
     },
     case ctypeSeq : _ c₁ c₂ _ _ ih₁ ih₂ {
-      have : (c₁ = SKIP) ∨ ¬(c₁ = SKIP), from em (c₁ = SKIP),
+      have : (c₁ = SKIP) ∨ (c₁ ≠ SKIP), from em (c₁ = SKIP),
 
-      cases' ‹(c₁ = SKIP) ∨ ¬(c₁ = SKIP)›,
+      cases' ‹(c₁ = SKIP) ∨ (c₁ ≠ SKIP)›,
         case or.inl : { -- c₁ = SKIP
           rw[‹c₁ = SKIP›] at *,
           
           show ∃ cs', (SKIP ;; c₂, s)↝cs', from ⟨ (c₂, s), Seq1 ⟩
         },
-        case or.inr : { -- ¬(c₁ = SKIP) 
+        case or.inr : { -- (c₁ ≠ SKIP) 
           have : ∃ cs', (c₁, s)↝cs', from ih₁ ‹(Γ ⊢₅ s)› ‹¬(c₁ = SKIP)›,
           cases' ‹∃ cs', (c₁, s)↝cs'› with cs',
           cases' cs' with c₁' s',
@@ -765,7 +766,7 @@ calcolo (la computazione non si blocca).
                         'Well typed programs cannot go wrong'.
 -/
 theorem type_soundness {Γ : tyenv} {c c' : com} {s s' : pstate} {cs'' : conf} :
-  (c, s)↝*(c', s') → (Γ ⊢. c) → (Γ ⊢₅ s) → ¬(c' = SKIP) → ∃ (cs'' : conf), (c', s')↝cs'':=
+  (c, s)↝*(c', s') → (Γ ⊢. c) → (Γ ⊢₅ s) → (c' ≠ SKIP) → ∃ (cs'' : conf), (c', s')↝cs'':=
 begin
   intros,
   induction' ‹(c, s)↝*(c', s')›,
