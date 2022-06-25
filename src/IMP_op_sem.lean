@@ -24,6 +24,7 @@ sono più 'naturali' rispetto alla medesima dimostrazione svolta su carta.
 * `vname` : nome di variabile, `string`
 * `val` : valore di un'espressione, `ℕ`
 * `pstate` : stato di programma, funzione da `vname` a `val`
+* `emp` : stato vuoto, assegna ad ogni variabile il valore 0
 * `s [ x  ↦  v ]` : aggiornamento dello stato `s`, con assegnazione di `v` a `x`
 * `::=` : comando di assegnamento
 * `;;` : concatenazione sequenziale di comandi
@@ -84,7 +85,7 @@ end
 Lemma tecnico utile all'utilizzo del tattico `simp` per l'applicazione degli stati.
 -/
 @[simp] lemma apply_state_update_neg {x y : vname} {s : pstate} {v : val} :
-  ¬(y = x) → s[x ↦ v] y = (s y) :=
+  (y ≠ x) → s[x ↦ v] y = (s y) :=
 begin
   intro,
   dsimp[state_update],
