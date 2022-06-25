@@ -2,7 +2,6 @@
 Authore: Andrea Delmastro
 -/
 import tactic.induction
-import IMP_state
 
 /-!
 # Semantica per IMP
