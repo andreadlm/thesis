@@ -104,11 +104,18 @@ begin
   show s₁ x = s₃ x, from trans ‹s₁ x = s₂ x› ‹s₂ x = s₃ x›
 end
 
+lemma symm {s t : pstate} {l : lv} :
+  s = t [< l] → t = s [< l] :=
+begin
+  intros _ x _, 
+  show t x = s x, from symm (‹s = t [< l]› x ‹sec x < l›)
+end
+
 lemma restrict {s t : pstate} {l₁ l₂ : lv} :
   s = t [< l₁] → (l₂ < l₁) → s = t [<= l₂] :=
 begin
   intros _ _ x _,
-  have : sec x < l₁, from gt_of_gt_of_ge ‹l₂ < l₁› ‹sec x ≤ l₂›,
+  have : sec x < l₁, from gt_of_gt_of_ge ‹l₂ < l₁› ‹sec x <= l₂›,
   show s x = t x, from ‹s = t [< l₁]› x ‹sec x < l₁› 
 end
 
@@ -132,7 +139,7 @@ begin
 end
 
 lemma trans {s₁ s₂ s₃ : pstate} {l : lv} : 
-  s₁ = s₂ [<= l] →  s₂ = s₃ [<= l] → s₁ = s₃ [<= l] :=
+  s₁ = s₂ [<= l] → s₂ = s₃ [<= l] → s₁ = s₃ [<= l] :=
 begin
   intros _ _ x _,
   have : s₁ x = s₂ x, from ‹s₁ = s₂ [<= l]› x ‹sec x <= l›,
@@ -144,7 +151,15 @@ lemma symm {s t : pstate} {l : lv} :
   s = t [<= l] → t = s [<= l] :=
 begin
   intros _ x _, 
-  show t x = s x, from (‹s = t [<= l]› x ‹sec x ≤ l›).symm
+  show t x = s x, from symm (‹s = t [<= l]› x ‹sec x <= l›)
+end
+
+lemma restrict {s t : pstate} {l₁ l₂ : lv} :
+  s = t [<= l₁] → (l₂ < l₁) → s = t [<= l₂] :=
+begin
+  intros _ _ x _,
+  have : sec x <= l₁, from le_of_lt (gt_of_gt_of_ge ‹l₂ < l₁› ‹sec x <= l₂›),
+  show s x = t x, from ‹s = t [<= l₁]› x ‹sec x <= l₁› 
 end
 
 end state_eq_beloweq_lv
